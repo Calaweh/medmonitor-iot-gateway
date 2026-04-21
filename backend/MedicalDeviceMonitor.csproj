@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MedicalDeviceMonitor</RootNamespace>
+    <AssemblyName>MedicalDeviceMonitor</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- PostgreSQL / Supabase connectivity -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design"   Version="8.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+
+    <!-- SignalR (built-in to ASP.NET Core, explicit for clarity) -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Core"      Version="8.0.4" />
+
+    <!-- JWT Authentication -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.4" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt"               Version="7.5.1" />
+
+    <!-- OpenAPI / Swagger UI -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+</Project>

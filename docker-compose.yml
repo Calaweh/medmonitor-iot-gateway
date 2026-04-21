@@ -1,0 +1,56 @@
+# ============================================================
+# docker-compose.yml — Local Development
+# ============================================================
+# This spins up the backend + frontend behind an Nginx reverse proxy.
+# The database lives on Supabase (cloud) — no local Postgres needed.
+#
+# Usage:
+#   docker-compose up --build
+#   Frontend → http://localhost:3000
+#   Backend  → http://localhost:3000/api  (proxied via Nginx)
+# ============================================================
+
+version: "3.9"
+
+services:
+
+  # ─── .NET 8 Web API ────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medmon_backend
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__Supabase=${SUPABASE_CONN_STRING}
+      - Jwt__Secret=${JWT_SECRET}
+      - Jwt__Issuer=${JWT_ISSUER}
+      - Jwt__Audience=${JWT_AUDIENCE}
+    expose:
+      - "5000"
+    restart: unless-stopped
+
+  # ─── React 19 + Vite (production build) ────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: medmon_frontend
+    expose:
+      - "80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ─── Nginx Reverse Proxy ────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: medmon_nginx
+    ports:
+      - "3000:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped

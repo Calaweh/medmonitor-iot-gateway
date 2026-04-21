@@ -1,0 +1,43 @@
+# ─── Secrets ────────────────────────────────────────────────
+.env.local
+.env.*.local
+*.env
+
+# ─── .NET / C# ──────────────────────────────────────────────
+backend/bin/
+backend/obj/
+backend/*.user
+backend/.vs/
+backend/**/*.user
+
+# ─── Node / Frontend ────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ─── Python ─────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+database/*.egg-info/
+database/.venv/
+database/venv/
+database/.env
+
+# ─── OS ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Docker ─────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ─── Database ───────────────────────────────────────────────
+database/data/
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+
+# ─── Other ──────────────────────────────────────────────────
+*.bak
+repomix-output.xml
+repomix.config.json
