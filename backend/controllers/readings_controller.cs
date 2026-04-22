@@ -8,10 +8,12 @@ namespace MedicalDeviceMonitor.Controllers;
 public class ReadingsController : ControllerBase
 {
     private readonly ReadingService _readingService;
+    private readonly ILogger<ReadingsController> _logger;
 
-    public ReadingsController(ReadingService readingService)
+    public ReadingsController(ReadingService readingService, ILogger<ReadingsController> logger)
     {
         _readingService = readingService;
+        _logger = logger;
     }
 
     [HttpPost("ingest")]
@@ -24,6 +26,7 @@ public class ReadingsController : ControllerBase
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "API Error ingesting data for device {DeviceCode}", dto.DeviceCode);
             return BadRequest(new { error = ex.Message });
         }
     }

@@ -19,11 +19,13 @@ public class ReadingService
 {
     private readonly AppDbContext _db;
     private readonly IHubContext<VitalSignsHub> _hub;
+    private readonly ILogger<ReadingService> _logger; 
 
-    public ReadingService(AppDbContext db, IHubContext<VitalSignsHub> hub)
+    public ReadingService(AppDbContext db, IHubContext<VitalSignsHub> hub, ILogger<ReadingService> logger)
     {
         _db = db;
         _hub = hub;
+        _logger = logger;
     }
 
     public async Task ProcessNewReadingAsync(IngestReadingDto dto)
@@ -31,8 +33,10 @@ public class ReadingService
         // 1. Find the device by code
         var device = await _db.Devices.FirstOrDefaultAsync(d => d.DeviceCode == dto.DeviceCode);
         
-        if (device == null)
+        if (device == null) {
+            _logger.LogWarning("Abnormal Event: Received data for unknown device {DeviceCode}", dto.DeviceCode);
             throw new Exception($"Device {dto.DeviceCode} not found.");
+        }
 
         // 2. Save to PostgreSQL
         var reading = new SensorReading

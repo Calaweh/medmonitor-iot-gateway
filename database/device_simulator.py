@@ -1,25 +1,3 @@
-"""
-device_simulator.py
-====================
-Simulates a medical device by replaying rows from a Kaggle ICU CSV dataset
-and POSTing each reading to the .NET backend REST API.
-
-Kaggle dataset (free):
-  "ICU Patients Vital Signs" — search on kaggle.com/datasets
-  Expected columns (after download & rename):
-    timestamp, heart_rate, spo2, systolic_bp, diastolic_bp, temperature, respiration
-
-Usage:
-  1. Download the dataset and save as: database/data/icu_vitals.csv
-  2. Install deps:  pip install -r requirements.txt
-  3. Run:           python device_simulator.py
-
-Environment variables (optional — defaults shown below):
-  BACKEND_API_URL   http://localhost:5000
-  DEVICE_CODE       ICU-BED-01
-  REPLAY_SPEED_SEC  1       (seconds between each row push)
-"""
-
 import os
 import time
 import csv
@@ -28,95 +6,74 @@ import random
 import requests
 from datetime import datetime, timezone
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import load_dotenv 
 
-# Load environment variables from parent directory .env
+# Load environment variables
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-# ─── Config ─────────────────────────────────────────────────
+# --- Configuration ---
 BACKEND_API_URL: str = os.getenv("BACKEND_API_URL", "http://localhost:5000")
+LOKI_URL: str        = os.getenv("LOKI_URL", "http://localhost:3100/loki/api/v1/push")
 DEVICE_CODE: str     = os.getenv("DEVICE_CODE", "ICU-BED-01")
 REPLAY_SPEED: float  = float(os.getenv("REPLAY_SPEED_SEC", "1"))
 CSV_PATH: Path       = Path(__file__).parent / "data" / "icu_vitals.csv"
+INGEST_ENDPOINT      = f"{BACKEND_API_URL}/api/readings/ingest"
 
-INGEST_ENDPOINT = f"{BACKEND_API_URL}/api/readings/ingest"
+# --- Loki Helper Function (Replaces the buggy library) ---
+def push_to_loki(level, message, status="normal"):
+    timestamp_ns = str(time.time_ns())
+    payload = {
+        "streams": [
+            {
+                "stream": {
+                    "app": "device_simulator",
+                    "level": level,
+                    "status": status,
+                    "device": DEVICE_CODE
+                },
+                "values": [
+                    [timestamp_ns, message]
+                ]
+            }
+        ]
+    }
+    try:
+        resp = requests.post(LOKI_URL, json=payload, timeout=2)
+        if resp.status_code not in (200, 204):
+            print(f"[debug-loki] ❌ Rejected: {resp.status_code} - {resp.text}")
+    except Exception as e:
+        print(f"[debug-loki] ❌ Connection Error: {e}")
 
-# ─── Column Mapping ─────────────────────────────────────────
+# --- Vitals Mapping & Alerts ---
 COLUMN_MAP = {
-    "heart_rate":       "heart_rate",
-    "spo2":             "spo2",
-    "systolic_bp":      "systolic_bp",
-    "diastolic_bp":     "diastolic_bp",
-    "temperature":      "temperature",
-    "respiratory_rate": "respiration"
+    "heart_rate": "heart_rate", "spo2": "spo2", "systolic_bp": "systolic_bp",
+    "diastolic_bp": "diastolic_bp", "temperature": "temperature", "respiratory_rate": "respiration"
 }
 
-# ─── Alert Thresholds (for local logging only) ───────────────
 THRESHOLDS = {
-    "heart_rate":  {"min": 40, "max": 120},
-    "spo2":        {"min": 90, "max": 100},
-    "systolic_bp": {"min": 80, "max": 180},
+    "heart_rate": {"min": 40, "max": 120},
+    "spo2": {"min": 90, "max": 100},
 }
-
 
 def check_alert(payload: dict) -> str | None:
-    """Return an alert message if any value exceeds clinical threshold."""
     for key, bounds in THRESHOLDS.items():
         val = payload.get(key)
-        if val is None:
-            continue
-        if val < bounds["min"]:
-            return f"LOW_{key.upper()}: {val} (min {bounds['min']})"
-        if val > bounds["max"]:
-            return f"HIGH_{key.upper()}: {val} (max {bounds['max']})"
+        if val and (val < bounds["min"] or val > bounds["max"]):
+            return f"CRITICAL_{key.upper()}: {val}"
     return None
 
-
-def generate_synthetic_row() -> dict:
-    """
-    Fallback: generate a synthetic reading if no CSV is found.
-    Values stay within realistic ICU ranges.
-    """
-    return {
-        "heart_rate":   random.randint(55, 110),
-        "spo2":         round(random.uniform(93.0, 100.0), 1),
-        "systolic_bp":  random.randint(90, 160),
-        "diastolic_bp": random.randint(60, 100),
-        "temperature":  round(random.uniform(36.0, 38.5), 1),
-        "respiration":  random.randint(12, 24),
-    }
-
-
 def stream_csv(path: Path):
-    """Generator: yields one payload dict per CSV row, loops forever."""
     while True:
         with open(path, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                payload = {}
-                for csv_col, json_key in COLUMN_MAP.items():
-                    raw = row.get(csv_col)
-                    if raw is not None:
-                        try:
-                            payload[json_key] = float(raw)
-                        except ValueError:
-                            pass
+                payload = {json_key: float(row[csv_col]) for csv_col, json_key in COLUMN_MAP.items() if row.get(csv_col)}
                 yield payload
-        print("[simulator] CSV exhausted — restarting from row 1 (loop mode)")
-
+        print("[simulator] CSV exhausted — looping...")
 
 def run():
     print(f"[simulator] Starting — target: {INGEST_ENDPOINT}")
-    print(f"[simulator] Device:  {DEVICE_CODE}")
-    print(f"[simulator] Speed:   {REPLAY_SPEED}s per reading")
-
-    if CSV_PATH.exists():
-        print(f"[simulator] Data source: {CSV_PATH}")
-        source = stream_csv(CSV_PATH)
-    else:
-        print(f"[simulator] ⚠️  CSV not found at {CSV_PATH}")
-        print("[simulator] Falling back to synthetic data generation.")
-        source = (generate_synthetic_row() for _ in iter(int, 1))  # infinite
+    source = stream_csv(CSV_PATH) if CSV_PATH.exists() else None # Add fallback if needed
 
     for payload in source:
         body = {
@@ -125,27 +82,31 @@ def run():
             "payload": payload,
         }
 
+        # 1. Check for clinical alerts
         alert = check_alert(payload)
         if alert:
-            print(f"[simulator] ⚠️  ALERT → {alert}")
+            print(f"[simulator] ⚠️  ALERT: {alert}")
+            push_to_loki("WARN", f"Clinical Alert: {alert}", status="abnormal")
 
+        # 2. Push to Backend
         try:
-            resp = requests.post(
-                INGEST_ENDPOINT,
-                json=body,
-                timeout=30,
-                headers={"Content-Type": "application/json"},
-            )
-            status = "✅" if resp.status_code in (200, 201) else f"❌ {resp.status_code}"
-            print(f"[simulator] {status}  HR={payload.get('heart_rate')}  "
-                  f"SpO2={payload.get('spo2')}  BP={payload.get('systolic_bp')}/{payload.get('diastolic_bp')}")
-        except requests.exceptions.ConnectionError:
-            print("[simulator] ⚠️  Cannot reach backend — is it running? Retrying...")
-        except Exception as exc:
-            print(f"[simulator] Error: {exc}")
+            resp = requests.post(INGEST_ENDPOINT, json=body, timeout=5)
+            
+            if resp.status_code in (200, 201):
+                print(f"[simulator] ✅  HR={payload.get('heart_rate')}")
+                # Optional: Only log normal pushes every 10th row to keep Loki clean
+                push_to_loki("INFO", f"Data pushed successfully HR={payload.get('heart_rate')}")
+            else:
+                # 3. Log Backend Rejections as ABNORMAL
+                error_text = f"Backend 400 Error: {resp.text}"
+                print(f"[simulator] ❌ {error_text}")
+                push_to_loki("ERROR", error_text, status="abnormal")
+
+        except Exception as e:
+            print(f"[simulator] ❌ Connection Error: {e}")
+            push_to_loki("ERROR", f"Connection Failed: {e}", status="abnormal")
 
         time.sleep(REPLAY_SPEED)
-
 
 if __name__ == "__main__":
     run()

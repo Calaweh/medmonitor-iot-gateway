@@ -3,6 +3,8 @@ using MedicalDeviceMonitor.Hubs;
 using MedicalDeviceMonitor.Services;
 using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
+using Serilog;
+using Serilog.Sinks.Grafana.Loki;
 
 // Load .env.local and force overwrite existing env vars
 var envDict = Env.Load("../.env", new LoadOptions(
@@ -11,7 +13,22 @@ var envDict = Env.Load("../.env", new LoadOptions(
     onlyExactPath: false
 ));
 
+var lokiUrl = Environment.GetEnvironmentVariable("LOKI_URL") ?? "http://localhost:3100";
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information() // Your logs
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning) // Hide system noise
+    .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)    // Hide system noise
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.GrafanaLoki(lokiUrl, labels: new[]
+    {
+        new Serilog.Sinks.Grafana.Loki.LokiLabel { Key = "app", Value = "medmon_backend" }
+    })
+    .CreateLogger();
+
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog(); 
 builder.Configuration.AddEnvironmentVariables();
 
 var connectionString = Environment.GetEnvironmentVariable("SUPABASE_CONN_STRING") 

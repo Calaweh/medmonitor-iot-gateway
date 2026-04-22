@@ -34,9 +34,10 @@ limits_config:
   retention_period: 360h        # 15 days × 24h = 360h
 
 compactor:
-  working_directory: /loki/compactor
+  working_directory: /loki/compactor 
+  delete_request_store: filesystem
   compaction_interval: 10m
-  retention_enabled: true       # must be true for retention_period to apply
+  retention_enabled: true       
   retention_delete_delay: 2h
   retention_delete_worker_count: 150
 
