@@ -56,15 +56,19 @@ database/*.sqlite
 database/*.sqlite3
 database/*.csv
 database/.env
+database/helper_scripts/*
 
 # ─── Node Modules (General) ──────────────────────────────────
 node_modules/
 
-# ─── Supabase ───────────────────────────────────────────────
+# ─── Supabase ────────────────────────────────────────────────
 supabase.toml
 supabase/
 
-# ─── Other ──────────────────────────────────────────────────
+# ─── Docs ────────────────────────────────────────────────────
+docs/personal_memorandum.txt
+
+# ─── Other ───────────────────────────────────────────────────
 *.bak
 repomix-output.xml
 repomix.config.json
