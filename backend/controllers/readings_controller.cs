@@ -30,4 +30,18 @@ public class ReadingsController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    [HttpGet("{deviceCode}/history")]
+    public async Task<IActionResult> GetHistory(string deviceCode, [FromQuery] int limit = 30)
+    {
+        try
+        {
+            var history = await _readingService.GetHistoryAsync(deviceCode, limit);
+            return Ok(history.Reverse()); 
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }

@@ -74,13 +74,33 @@ To demonstrate industrial maturity, we avoid manual SQL execution in the dashboa
 
 ---
 
-## 5. Execution Plan 
+## 5. Project Status & To-Do List
 
-**Initial Setup Phase (Pre-Week 1)**
+**Current Progress:** [████░░░░░░] 40%
+
+### ✅ Completed
+- [x] Initial local Git version control (`git init`)
+- [x] Configure a robust `.gitignore` file
+- [x] Setup environment variable management (`.env` + `DotNetEnv`)
+- [x] **Python Simulation:** Isolated dependencies using **venv**
+- [x] **DevOps:** Multi-stage **Dockerfile** for Backend and Frontend
+- [x] **DevOps:** `docker-compose.yml` with monitoring stack (VictoriaMetrics/Loki/Grafana)
+
+### 🚀 Upcoming Tasks
+- [ ] GitHub Push · Supabase CLI linking · Database migrations
+- [ ] .NET 8 REST API (CRUD, filtering, connect to Supabase)
+- [ ] React + Vite frontend · Real-time charts via SignalR
+- [ ] Polish UI/UX · Decimation logic · Production deployment
+
+---
+
+## 6. Execution Plan 
+
+**Initial Setup Phase**
 - Initialize local Git version control (`git init`).
 - Configure a robust `.gitignore` file to ensure secrets, binaries, and dependencies are never committed.
 
-| Week | Deliverable                                              |
+| No. | Deliverable                                              |
 |------|----------------------------------------------------------|
 | 1    | Push to GitHub repo · **Setup Supabase CLI** · migrations · Seed Python script |
 | 2    | .NET 8 REST API (CRUD, filtering, connect to Supabase)   | 
@@ -90,7 +110,7 @@ To demonstrate industrial maturity, we avoid manual SQL execution in the dashboa
 
 ---
 
-## 6. Deployment Notes
+## 7. Deployment Notes
 
 - **Database:** Supabase (Free tier: 500MB storage, 2 active projects).
 - **Backend:** Railway or Render (.NET Docker container). Connects to Supabase via `DATABASE_URL` environment variable.
@@ -99,7 +119,7 @@ To demonstrate industrial maturity, we avoid manual SQL execution in the dashboa
 
 ---
 
-## 7. Frontend Framework: React + Vite (Recommended)
+## 8. Frontend Framework: React + Vite (Recommended)
 
 React is the clear choice for this project's target market:
 
@@ -115,7 +135,7 @@ React is the clear choice for this project's target market:
 
 ---
 
-## 8. Project Folder Structure
+## 9. Project Folder Structure
 
 ```
 medical-device-monitoring/
@@ -143,7 +163,7 @@ medical-device-monitoring/
 
 ---
 
-## 9. README Must-Haves (Your Hiring Pitch)
+## 10. README
 
 1. **Architecture diagram** (draw.io or Mermaid) — Device Simulator → .NET API → Supabase Postgres → SignalR → React.
 2. **Challenges & Solutions** section — e.g., *"Charts lagged at 1,000 data points → implemented server-side data decimation in .NET before sending via SignalR."*
@@ -153,7 +173,7 @@ medical-device-monitoring/
 
 ---
 
-## 10. Risk Register
+## 11. Risk Register
 
 | Risk                             | Severity | Mitigation                                                        |
 |----------------------------------|----------|-------------------------------------------------------------------|
@@ -163,18 +183,6 @@ medical-device-monitoring/
 | Timeline slip                    | Medium   | Weekly incremental builds; deploy early                          |
 | Database Sync Issues             | Low      | Use **Supabase CLI & Migrations** for consistent schema across dev/prod |
 | Complex .NET EF Core migrations  | Low      | Use Dapper or raw ADO.NET if EF Core mapping to JSONB gets too complex |
-
----
-
-## 11. Post-Launch Checklist
-
-- [ ] Supabase connected via connection string (not Supabase Client SDK)
-- [ ] Live URL on Railway / Render working
-- [ ] Architecture diagram in README
-- [ ] "Challenges Solved" section written
-- [ ] Screen-recording GIF of the local TCP ingestion added to README
-- [ ] LinkedIn post with live link
-- [ ] Resume updated with project URL + tech stack
 
 ---
 

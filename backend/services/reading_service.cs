@@ -50,6 +50,13 @@ public class ReadingService
         };
 
         _db.SensorReadings.Add(reading);
+
+        if (dto.Payload.TryGetProperty("heart_rate", out var hr) && (hr.GetDouble() > 120 || hr.GetDouble() < 40))
+        {
+            _logger.LogWarning("Clinical Alert: Abnormal Heart Rate {HR} for {Device}", hr.GetDouble(), dto.DeviceCode);
+            // In a real app, you'd save to an 'alerts' table here as per schema.sql
+        }
+
         await _db.SaveChangesAsync();
 
         // 3. Broadcast to React Frontend via SignalR WebSocket
@@ -61,5 +68,22 @@ public class ReadingService
             reading.RecordedAt,
             Payload = dto.Payload // Send the raw JSON payload to React
         });
+    }
+
+    public async Task<IEnumerable<object>> GetHistoryAsync(string deviceCode, int limit)
+    {
+        return await _db.SensorReadings
+            .Include(r => r.Device)
+            .Where(r => r.Device.DeviceCode == deviceCode)
+            .OrderByDescending(r => r.RecordedAt)
+            .Take(limit)
+            .Select(r => new {
+                r.Id,
+                r.DeviceId,
+                DeviceCode = r.Device.DeviceCode,
+                r.RecordedAt,
+                r.Payload
+            })
+            .ToListAsync();
     }
 }

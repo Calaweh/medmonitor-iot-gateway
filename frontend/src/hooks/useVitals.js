@@ -1,29 +1,33 @@
 import { useEffect, useState } from "react";
 import * as signalR from "@microsoft/signalr";
+import axios from "axios";
 
-export const useVitals = (backendUrl) => {
+export const useVitals = (backendUrl, deviceCode = "ICU-BED-01") => {
   const [readings, setReadings] = useState([]);
   const [latestReading, setLatestReading] = useState(null);
 
   useEffect(() => {
+    // 1. Fetch History
+    axios.get(`${backendUrl}/api/readings/${deviceCode}/history`)
+      .then(res => setReadings(res.data))
+      .catch(err => console.error("History fetch failed", err));
+
+    // 2. Setup Real-time
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(`${backendUrl}/hubs/vitalsigns`)
       .withAutomaticReconnect()
       .build();
 
     connection.on("ReceiveNewReading", (data) => {
-      console.log("New reading received:", data);
-      setLatestReading(data);
-      setReadings((prev) => {
-        const newList = [...prev, data];
-        return newList.slice(-30); // Keep only the last 30 readings for the chart
-      });
+      if (data.deviceCode === deviceCode) {
+        setLatestReading(data);
+        setReadings((prev) => [...prev.slice(-29), data]);
+      }
     });
 
-    connection.start().catch((err) => console.error("SignalR Connection Error: ", err));
-
+    connection.start().catch(console.error);
     return () => connection.stop();
-  }, [backendUrl]);
+  }, [backendUrl, deviceCode]);
 
   return { readings, latestReading };
 };
