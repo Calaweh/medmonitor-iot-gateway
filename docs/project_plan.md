@@ -13,14 +13,14 @@
 |--------------|-------------------------------------|-------------------------------------------------------------|
 | Frontend     | React 19 + Vite + Recharts          | Fast HMR, rich charting ecosystem, highest job-market ROI   |
 | Backend      | .NET 8 (C#) Web API                 | Preferred by medical device companies; native async & SignalR |
-| Database     | **PostgreSQL via Supabase**         | 500MB free managed Postgres; full access to JSONB/GIN features |
+| Database     | PostgreSQL via Supabase             | 500MB free managed Postgres; full access to JSONB/GIN features |
 | Real-time    | SignalR (WebSocket)                 | Native to .NET; production-grade for device data streams    |
 | DevOps       | Docker + docker-compose + Nginx     | Multi-stage builds; reverse proxy for frontend + backend    |
-| Deployment   | Railway / Render + **Supabase**     | Free-tier PaaS + reliable cloud database; zero overhead     |
+| Deployment   | Railway / Render + Supabase         | Free-tier PaaS + reliable cloud database; zero overhead     |
 | Simulation   | Python script + Kaggle CSV          | "Replay" a real ICU dataset to simulate a physical device   |
-| Environment  | **DotNetEnv** & **venv**            | Centralized `.env` management & isolated dependencies        |
-| DevOps       | **Supabase CLI** + Migrations       | Version-controlled database schema (The DevOps Way)          |
-| Monitoring   | **VictoriaMetrics + Loki + Grafana**| Time-series & log observability with 15-day retention policy |
+| Environment  | DotNetEnv & venv                    | Centralized `.env` management & isolated dependencies        |
+| DevOps       | Supabase CLI + Migrations           | Version-controlled database schema (The DevOps Way)          |
+| Monitoring   | VictoriaMetrics + Loki + Grafana    | Time-series & log observability with 15-day retention policy |
 
 
 ---
@@ -75,8 +75,6 @@ To demonstrate industrial maturity, we avoid manual SQL execution in the dashboa
 ---
 
 ## 5. Project Status & To-Do List
-
-**Current Progress:** [████░░░░░░] 40%
 
 ### ✅ Completed
 - [x] Initial local Git version control (`git init`)
