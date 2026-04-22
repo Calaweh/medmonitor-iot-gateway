@@ -1,0 +1,27 @@
+# ============================================================
+# Grafana Datasource Provisioning
+# Automatically registers VictoriaMetrics and Loki on startup.
+# ============================================================
+apiVersion: 1
+
+datasources:
+
+  # ─── VictoriaMetrics (Prometheus-compatible) ───────────────
+  - name: VictoriaMetrics
+    type: prometheus
+    uid: victoriametrics
+    url: http://victoriametrics:8428
+    access: proxy
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: "15s"
+
+  # ─── Loki (Log aggregation) ─────────────────────────────────
+  - name: Loki
+    type: loki
+    uid: loki
+    url: http://loki:3100
+    access: proxy
+    jsonData:
+      maxLines: 1000

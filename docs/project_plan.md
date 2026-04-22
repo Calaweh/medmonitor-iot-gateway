@@ -20,8 +20,8 @@
 | Simulation   | Python script + Kaggle CSV          | "Replay" a real ICU dataset to simulate a physical device   |
 | Environment  | **DotNetEnv** & **venv**            | Centralized `.env` management & isolated dependencies        |
 | DevOps       | **Supabase CLI** + Migrations       | Version-controlled database schema (The DevOps Way)          |
+| Monitoring   | **VictoriaMetrics + Loki + Grafana**| Time-series & log observability with 15-day retention policy |
 
-**Excluded intentionally:** Redis, Prometheus, VictoriaMetrics, Grafana — unnecessary for a portfolio demo.
 
 ---
 
@@ -41,6 +41,16 @@
 - **Tool:** Download real "ICU Vital Signs" from Kaggle (Timestamp, HR, SpO2, BP). Write a Python script to "replay" this data row-by-row into your .NET backend.
 - **Volume:** 20,000 to 50,000 rows — large enough for realistic pagination/aggregation, small enough for free-tier hosting forever.
 - **Storage estimate:** ~80 MB; **Supabase free tier provides 500 MB** (6× headroom).
+
+### 3.1 Observability & Data Retention Strategy
+
+To demonstrate enterprise-level infrastructure awareness, the system includes a dedicated monitoring stack:
+- **VictoriaMetrics**: Handles high-performance time-series metrics from the backend and system.
+  - *Retention:* 15 days (auto-purged to manage disk space).
+- **Loki**: Aggregates logs from the .NET backend and simulation scripts.
+  - *Retention:* 15 days (enforced via Loki compactor).
+- **Grafana**: Provides a unified dashboard for system health and data ingestion rates.
+  - *Persistence:* Permanent (dashboards and datasources survive rebuilds via Docker volumes).
 
 ---
 
@@ -122,8 +132,12 @@ medical-device-monitoring/
 │   ├── migrations/            # Supabase migrations (DevOps way)
 │   ├── schema.sql             # Reference SQL schema
 │   └── device_simulator.py    # Python script to read Kaggle CSV & stream to backend
-├── docker-compose.yml         # app + nginx (for local dev)
-├── .env.example               # SUPABASE_CONN_STRING="Host=aws-0-....pooler.supabase.com;..."
+├── docker/                    # Infrastructure configurations
+│   ├── nginx.conf             # Reverse proxy config
+│   ├── loki-config.yml        # Log retention & storage rules
+│   └── grafana/               # Dashboards & Datasource provisioning
+├── docker-compose.yml         # full stack (app + monitoring)
+├── .env.example               # SUPABASE_CONN_STRING, GRAFANA_USER, etc.
 └── README.md                  # Architecture diagram + challenges
 ```
 
@@ -180,3 +194,8 @@ To ensure "zero-config" portability and professional standards, we utilize sever
 ### DevOps
 - **Supabase CLI**: Provides a command-line interface for database management, enabling the migration-based workflow.
 - **dotenv-cli**: A helper tool to inject environment variables into the Supabase CLI commands.
+
+### 12.4 Monitoring & Observability
+- **VictoriaMetrics**: Chosen over standard Prometheus for its significantly lower RAM/CPU footprint and simpler retention management, making it ideal for resource-constrained demo environments.
+- **Loki**: Provides "Prometheus-like" log aggregation. By indexing labels instead of full text, it keeps storage requirements minimal while still allowing for powerful log filtering across the entire stack.
+- **Grafana**: The industry standard for visualization. Pre-provisioned datasources ensure that the project is "plug-and-play" for anyone reviewing the code.

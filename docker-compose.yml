@@ -6,11 +6,12 @@
 #
 # Usage:
 #   docker-compose up --build
-#   Frontend → http://localhost:3000
-#   Backend  → http://localhost:3000/api  (proxied via Nginx)
+#   Frontend         → http://localhost:3000
+#   Backend          → http://localhost:3000/api  (proxied via Nginx)
+#   Grafana          → http://localhost:3001
+#   VictoriaMetrics  → http://localhost:8428
+#   Loki             → http://localhost:3100
 # ============================================================
-
-version: "3.9"
 
 services:
 
@@ -54,3 +55,56 @@ services:
       - backend
       - frontend
     restart: unless-stopped
+
+  # ─── VictoriaMetrics ────────────────────────────────────────
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: medmon_victoriametrics
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm_data:/storage
+    command:
+      - "--storageDataPath=/storage"
+      - "--retentionPeriod=15d"
+      - "--httpListenAddr=:8428"
+    restart: unless-stopped
+
+  # ─── Loki ──────────────────────────────────────────────────
+  loki:
+    image: grafana/loki:latest
+    container_name: medmon_loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+      - ./docker/loki-config.yml:/etc/loki/loki-config.yml:ro
+    command: -config.file=/etc/loki/loki-config.yml
+    restart: unless-stopped
+
+  # ─── Grafana ───────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: medmon_grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - victoriametrics
+      - loki
+    restart: unless-stopped
+
+# ─── Named Volumes ────────────────────────────────────────────
+# vm_data    — temp  (15 days enforced by --retentionPeriod flag)
+# loki_data  — temp  (15 days enforced by loki-config.yml)
+# grafana_data — permanent (no retention limit)
+volumes:
+  vm_data:
+  loki_data:
+  grafana_data:
