@@ -3,6 +3,8 @@
 .env.*.local
 *.env
 backend/appsettings.json
+backend/logs/
+backup/
 
 # ─── .NET / C# ──────────────────────────────────────────────
 backend/bin/

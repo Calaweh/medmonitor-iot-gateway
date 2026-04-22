@@ -69,6 +69,8 @@ builder.Services.AddScoped(typeof(ReadingService));
 
 var app = builder.Build();
 
+Log.Information("Medical Device Monitor Backend is starting up on {Time}", DateTime.Now);
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

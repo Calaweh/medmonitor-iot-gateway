@@ -13,7 +13,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 # --- Configuration ---
 BACKEND_API_URL: str = os.getenv("BACKEND_API_URL", "http://localhost:5000")
-LOKI_URL: str        = os.getenv("LOKI_URL", "http://localhost:3100/loki/api/v1/push")
+LOKI_URL: str        = f"{os.getenv('LOKI_URL', 'http://localhost:3100')}/loki/api/v1/push"
 DEVICE_CODE: str     = os.getenv("DEVICE_CODE", "ICU-BED-01")
 REPLAY_SPEED: float  = float(os.getenv("REPLAY_SPEED_SEC", "1"))
 CSV_PATH: Path       = Path(__file__).parent / "data" / "icu_vitals.csv"

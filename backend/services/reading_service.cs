@@ -4,6 +4,7 @@ using MedicalDeviceMonitor.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using Serilog;
 
 namespace MedicalDeviceMonitor.Services;
 
@@ -37,6 +38,8 @@ public class ReadingService
             _logger.LogWarning("Abnormal Event: Received data for unknown device {DeviceCode}", dto.DeviceCode);
             throw new Exception($"Device {dto.DeviceCode} not found.");
         }
+
+        Log.Information("Processing reading for {DeviceCode}. HR: {HR}", dto.DeviceCode, dto.Payload.GetProperty("heart_rate"));
 
         // 2. Save to PostgreSQL
         var reading = new SensorReading
