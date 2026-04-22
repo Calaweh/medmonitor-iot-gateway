@@ -1,12 +1,19 @@
 using MedicalDeviceMonitor.Data;
 using MedicalDeviceMonitor.Hubs;
 using Microsoft.EntityFrameworkCore;
+using dotenv.net;
+
+DotEnv.Load(options: new DotEnvOptions(envFilePaths: new[] { "../.env", ".env" }));
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ─── Database (Supabase / PostgreSQL) ───────────────────────
+builder.Configuration.AddEnvironmentVariables();
+
+var connectionString = Environment.GetEnvironmentVariable("SUPABASE_CONN_STRING") 
+                       ?? builder.Configuration.GetConnectionString("Supabase");
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Supabase")));
+    options.UseNpgsql(connectionString));
 
 // ─── SignalR ─────────────────────────────────────────────────
 builder.Services.AddSignalR();
@@ -33,7 +40,6 @@ builder.Services.AddSwaggerGen();
 
 // ─── Business Services ───────────────────────────────────────
 builder.Services.AddScoped<MedicalDeviceMonitor.Services.ReadingService>();
-builder.Services.AddScoped<MedicalDeviceMonitor.Services.AlertService>();
 
 var app = builder.Build();
 

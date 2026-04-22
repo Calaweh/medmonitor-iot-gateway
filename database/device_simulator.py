@@ -38,15 +38,13 @@ CSV_PATH: Path       = Path(__file__).parent / "data" / "icu_vitals.csv"
 INGEST_ENDPOINT = f"{BACKEND_API_URL}/api/readings/ingest"
 
 # ─── Column Mapping ─────────────────────────────────────────
-# Maps CSV column names → JSON payload keys.
-# Edit this if your Kaggle CSV uses different column headers.
 COLUMN_MAP = {
-    "heart_rate":    "heart_rate",
-    "spo2":          "spo2",
-    "systolic_bp":   "systolic_bp",
-    "diastolic_bp":  "diastolic_bp",
-    "temperature":   "temperature",
-    "respiration":   "respiration",
+    "heart_rate":       "heart_rate",
+    "spo2":             "spo2",
+    "systolic_bp":      "systolic_bp",
+    "diastolic_bp":     "diastolic_bp",
+    "temperature":      "temperature",
+    "respiratory_rate": "respiration"
 }
 
 # ─── Alert Thresholds (for local logging only) ───────────────

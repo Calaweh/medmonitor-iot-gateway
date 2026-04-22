@@ -42,9 +42,9 @@
 
 ---
 
-## 4. ⚠️ The Supabase Strategy (Crucial for Interviews)
+## 4. The Supabase Strategy 
 
-Supabase is a "Backend-as-a-Service" that offers its own APIs, Auth, and WebSockets. **Do not use them.** If you use Supabase's built-in tools, interviewers will think you don't know how to code a backend.
+Supabase is a "Backend-as-a-Service" that offers its own APIs, Auth, and WebSockets. **Do not use them.**
 
 Instead, use Supabase **strictly as a cloud PostgreSQL database**:
 1. Create a Supabase project and grab the **PostgreSQL Connection String** (Transaction mode).
@@ -56,17 +56,19 @@ Instead, use Supabase **strictly as a cloud PostgreSQL database**:
 
 ---
 
-## 5. Execution Plan (5–8 Weeks @ 10–15 hrs/week)
+## 5. Execution Plan 
 
-| Week | Deliverable                                              | Hours      |
-|------|----------------------------------------------------------|------------|
-| 1    | GitHub repo · **Setup Supabase DB** · schema.sql · Seed Python script | 12–15 hrs |
-| 2    | .NET 8 REST API (CRUD, filtering, connect to Supabase)   | 10–12 hrs  |
-| 3    | React + Vite frontend · dashboard layout · API wiring    | 12–15 hrs  |
-| 4    | SignalR / WebSocket live updates · TCP simulator         | 10–12 hrs  |
-| 5    | Dockerfile · docker-compose.yml · deploy to Render       | 8–10 hrs   |
+**Initial Setup Phase (Pre-Week 1)**
+- Initialize local Git version control (`git init`).
+- Configure a robust `.gitignore` file to ensure secrets, binaries, and dependencies are never committed.
 
-> **Tip:** Deploy by Week 4 so Week 5 is polish-only. Don't wait until the last week to start Docker.
+| Week | Deliverable                                              |
+|------|----------------------------------------------------------|
+| 1    | Push to GitHub repo · **Setup Supabase DB** · schema.sql · Seed Python script |
+| 2    | .NET 8 REST API (CRUD, filtering, connect to Supabase)   | 
+| 3    | React + Vite frontend · dashboard layout · API wiring    | 
+| 4    | SignalR / WebSocket live updates · TCP simulator         | 
+| 5    | Dockerfile · docker-compose.yml · deploy to Render       | 
 
 ---
 
