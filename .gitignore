@@ -2,6 +2,7 @@
 .env.local
 .env.*.local
 *.env
+backend/appsettings.json
 
 # ─── .NET / C# ──────────────────────────────────────────────
 backend/bin/
@@ -36,6 +37,7 @@ database/data/
 database/*.db
 database/*.sqlite
 database/*.sqlite3
+database/*.csv
 
 # ─── Other ──────────────────────────────────────────────────
 *.bak
