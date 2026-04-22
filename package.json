@@ -1,0 +1,13 @@
+{
+  "name": "med-device-monitor-ops",
+  "version": "1.0.0",
+  "description": "Database management scripts",
+  "scripts": {
+    "db:init": "dotenv -- npx supabase db query --linked --file database/schema.sql",
+    "run-sql": "dotenv -- npx supabase db query --linked --file"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^8.0.0",
+    "supabase": "^2.93.0"
+  }
+}

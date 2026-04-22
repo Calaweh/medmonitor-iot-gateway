@@ -18,6 +18,8 @@
 | DevOps       | Docker + docker-compose + Nginx     | Multi-stage builds; reverse proxy for frontend + backend    |
 | Deployment   | Railway / Render + **Supabase**     | Free-tier PaaS + reliable cloud database; zero overhead     |
 | Simulation   | Python script + Kaggle CSV          | "Replay" a real ICU dataset to simulate a physical device   |
+| Environment  | **DotNetEnv** & **venv**            | Centralized `.env` management & isolated dependencies        |
+| DevOps       | **Supabase CLI** + Migrations       | Version-controlled database schema (The DevOps Way)          |
 
 **Excluded intentionally:** Redis, Prometheus, VictoriaMetrics, Grafana — unnecessary for a portfolio demo.
 
@@ -54,6 +56,12 @@ Instead, use Supabase **strictly as a cloud PostgreSQL database**:
 
 **Why this works:** You get a world-class, free, cloud-hosted database, but you still prove to employers that you can write complex backend logic, queries, and socket routing in C#.
 
+### 4.1 The DevOps Way (CLI & Migrations)
+To demonstrate industrial maturity, we avoid manual SQL execution in the dashboard:
+1.  **Supabase CLI**: Installed as a dev dependency to manage the project locally.
+2.  **Migrations**: Every schema change is captured in a timestamped `.sql` file, allowing for reproducible database states across different environments (local vs. production).
+3.  **Local Development**: Using `supabase init` and `supabase link` to bridge the gap between local code and cloud infrastructure.
+
 ---
 
 ## 5. Execution Plan 
@@ -64,7 +72,7 @@ Instead, use Supabase **strictly as a cloud PostgreSQL database**:
 
 | Week | Deliverable                                              |
 |------|----------------------------------------------------------|
-| 1    | Push to GitHub repo · **Setup Supabase DB** · schema.sql · Seed Python script |
+| 1    | Push to GitHub repo · **Setup Supabase CLI** · migrations · Seed Python script |
 | 2    | .NET 8 REST API (CRUD, filtering, connect to Supabase)   | 
 | 3    | React + Vite frontend · dashboard layout · API wiring    | 
 | 4    | SignalR / WebSocket live updates · TCP simulator         | 
@@ -111,7 +119,8 @@ medical-device-monitoring/
 │   ├── Models/
 │   └── Dockerfile
 ├── database/
-│   ├── schema.sql             # Table definitions + GIN index to run in Supabase SQL Editor
+│   ├── migrations/            # Supabase migrations (DevOps way)
+│   ├── schema.sql             # Reference SQL schema
 │   └── device_simulator.py    # Python script to read Kaggle CSV & stream to backend
 ├── docker-compose.yml         # app + nginx (for local dev)
 ├── .env.example               # SUPABASE_CONN_STRING="Host=aws-0-....pooler.supabase.com;..."
@@ -138,6 +147,7 @@ medical-device-monitoring/
 | JSONB query slowness at scale    | Low      | GIN index on payload column via Supabase SQL Editor               |
 | Supabase DB Auto-Pausing         | Medium   | Set calendar reminder to ping the DB, or wake it up before interviews |
 | Timeline slip                    | Medium   | Weekly incremental builds; deploy early                          |
+| Database Sync Issues             | Low      | Use **Supabase CLI & Migrations** for consistent schema across dev/prod |
 | Complex .NET EF Core migrations  | Low      | Use Dapper or raw ADO.NET if EF Core mapping to JSONB gets too complex |
 
 ---
@@ -151,3 +161,22 @@ medical-device-monitoring/
 - [ ] Screen-recording GIF of the local TCP ingestion added to README
 - [ ] LinkedIn post with live link
 - [ ] Resume updated with project URL + tech stack
+
+---
+
+## 12. Dependency & Environment Rationale
+
+To ensure "zero-config" portability and professional standards, we utilize several key dependencies:
+
+### Backend (.NET 8)
+- **DotNetEnv**: Decouples configuration from the binary by loading `.env` files. This is essential for preventing secret leaks to GitHub.
+- **Npgsql.EntityFrameworkCore.PostgreSQL**: The standard provider for connecting C# applications to PostgreSQL, supporting advanced features like JSONB.
+- **Swashbuckle**: Automatically generates OpenAPI/Swagger documentation, proving that the API is built to industry standards.
+
+### Simulation (Python)
+- **venv (Virtual Environment)**: Essential for isolating project dependencies (`requests`, `python-dotenv`) from the system Python installation.
+- **python-dotenv**: Allows the simulator to share the same `.env` file as the backend, ensuring a "single source of truth" for configuration.
+
+### DevOps
+- **Supabase CLI**: Provides a command-line interface for database management, enabling the migration-based workflow.
+- **dotenv-cli**: A helper tool to inject environment variables into the Supabase CLI commands.

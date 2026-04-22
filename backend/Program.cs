@@ -1,49 +1,57 @@
 using MedicalDeviceMonitor.Data;
 using MedicalDeviceMonitor.Hubs;
+using MedicalDeviceMonitor.Services;
 using Microsoft.EntityFrameworkCore;
-using dotenv.net;
+using DotNetEnv;
 
-DotEnv.Load(options: new DotEnvOptions(envFilePaths: new[] { "../.env", ".env" }));
+// Load .env.local and force overwrite existing env vars
+var envDict = Env.Load("../.env", new LoadOptions(
+    setEnvVars: true,
+    clobberExistingVars: true,
+    onlyExactPath: false
+));
 
 var builder = WebApplication.CreateBuilder(args);
-
 builder.Configuration.AddEnvironmentVariables();
 
 var connectionString = Environment.GetEnvironmentVariable("SUPABASE_CONN_STRING") 
                        ?? builder.Configuration.GetConnectionString("Supabase");
 
+if (string.IsNullOrEmpty(connectionString))
+{
+    throw new InvalidOperationException("SUPABASE_CONN_STRING environment variable or configuration is missing. Check your .env.local file.");
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString, npgsqlOptions =>
+    {
+        npgsqlOptions.CommandTimeout(10);
+    })
+);
 
-// ─── SignalR ─────────────────────────────────────────────────
 builder.Services.AddSignalR();
-
-// ─── Controllers ─────────────────────────────────────────────
 builder.Services.AddControllers();
 
-// ─── CORS ────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
         policy.WithOrigins(
-                "http://localhost:5173",  // Vite dev server
-                "http://localhost:3000"   // Docker / Nginx
+                "http://localhost:5173",
+                "http://localhost:3000"
               )
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials());       // Required for SignalR
+              .AllowCredentials());
 });
 
-// ─── Swagger ─────────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ─── Business Services ───────────────────────────────────────
-builder.Services.AddScoped<MedicalDeviceMonitor.Services.ReadingService>();
+// Register ReadingService
+builder.Services.AddScoped(typeof(ReadingService));
 
 var app = builder.Build();
 
-// ─── Middleware Pipeline ─────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -53,8 +61,6 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowFrontend");
 app.UseAuthorization();
 app.MapControllers();
-
-// ─── SignalR Hub ─────────────────────────────────────────────
 app.MapHub<VitalSignsHub>("/hubs/vitalsigns");
 
 app.Run();

@@ -28,6 +28,10 @@ import random
 import requests
 from datetime import datetime, timezone
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from parent directory .env
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 # ─── Config ─────────────────────────────────────────────────
 BACKEND_API_URL: str = os.getenv("BACKEND_API_URL", "http://localhost:5000")
@@ -129,7 +133,7 @@ def run():
             resp = requests.post(
                 INGEST_ENDPOINT,
                 json=body,
-                timeout=5,
+                timeout=30,
                 headers={"Content-Type": "application/json"},
             )
             status = "✅" if resp.status_code in (200, 201) else f"❌ {resp.status_code}"

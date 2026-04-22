@@ -38,8 +38,7 @@ public class ReadingService
         var reading = new SensorReading
         {
             DeviceId = device.Id,
-            RecordedAt = dto.RecordedAt,
-            // Convert JsonElement to JsonDocument for EF Core JSONB mapping
+            RecordedAt = dto.RecordedAt.ToUniversalTime(), 
             Payload = JsonDocument.Parse(dto.Payload.GetRawText()) 
         };
 

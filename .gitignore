@@ -14,7 +14,22 @@ backend/**/*.user
 # ─── Node / Frontend ────────────────────────────────────────
 frontend/node_modules/
 frontend/dist/
+frontend/dist-ssr/
 frontend/.vite/
+frontend/coverage/
+frontend/*.tsbuildinfo
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/*.local
 
 # ─── Python ─────────────────────────────────────────────────
 __pycache__/
@@ -38,8 +53,17 @@ database/*.db
 database/*.sqlite
 database/*.sqlite3
 database/*.csv
+database/.env
+
+# ─── Node Modules (General) ──────────────────────────────────
+node_modules/
+
+# ─── Supabase ───────────────────────────────────────────────
+supabase.toml
+supabase/
 
 # ─── Other ──────────────────────────────────────────────────
 *.bak
 repomix-output.xml
 repomix.config.json
+.claude

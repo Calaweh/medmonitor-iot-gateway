@@ -45,6 +45,9 @@
 ├── database/          # schema.sql + device_simulator.py
 ├── docker/            # Nginx config
 ├── docker-compose.yml # Local dev orchestration
+├── docs/              # Technical documentation
+│   ├── portfolio_project_plan.md
+│   └── devops_guide.md # Supabase CLI, Migrations, & Env setup
 ├── .env.example       # Environment variable template
 └── README.md
 ```
@@ -88,6 +91,11 @@ npm run dev
 ### 5. Run Device Simulator
 ```bash
 cd database
+# Create and activate virtual environment (venv)
+python -m venv venv
+.\venv\Scripts\activate
+
+# Install dependencies and run
 pip install -r requirements.txt
 python device_simulator.py
 # Streams ICU data rows to the backend every second
@@ -101,6 +109,19 @@ docker-compose up --build
 
 ---
 
+## 🛠️ DevOps & Database Management
+
+For a professional workflow using the **Supabase CLI** and **Database Migrations**, please refer to our:
+
+👉 **[DevOps Guide](docs/devops_guide.md)**
+
+It covers:
+- Supabase CLI setup.
+- Database migration workflow.
+- Environment management with `venv` and `DotNetEnv`.
+
+---
+
 ## ⚙️ Tech Choices & Trade-offs
 
 | Decision | Choice | Why |
@@ -109,6 +130,7 @@ docker-compose up --build
 | Backend | .NET 8 Web API | Medical device companies (Keysight, Pentamaster) favour C# |
 | Real-time | SignalR | Native .NET WebSocket abstraction; production-grade |
 | Data simulation | Python CSV replay | Kaggle ICU dataset gives realistic HR/SpO₂/BP ranges |
+| Environment | DotNetEnv + .env | Centralized config management across C# and Python |
 | JSONB + GIN index | Yes | Efficient storage and querying of flexible sensor payloads |
 
 ---
