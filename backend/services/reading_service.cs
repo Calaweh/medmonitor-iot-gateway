@@ -39,7 +39,7 @@ public class ReadingService
             throw new Exception($"Device {dto.DeviceCode} not found.");
         }
 
-        Log.Information("Processing reading for {DeviceCode}. HR: {HR}", dto.DeviceCode, dto.Payload.GetProperty("heart_rate"));
+        Log.Information("Processing reading for {device}. HR: {HR}", dto.DeviceCode, dto.Payload.GetProperty("heart_rate"));
 
         // 2. Save to PostgreSQL
         var reading = new SensorReading
@@ -54,7 +54,7 @@ public class ReadingService
         Alert? newAlert = null;
         if (dto.Payload.TryGetProperty("heart_rate", out var hr) && (hr.GetDouble() > 120 || hr.GetDouble() < 40))
         {
-            _logger.LogWarning("Clinical Alert: Abnormal Heart Rate {HR} for {Device}", hr.GetDouble(), dto.DeviceCode);
+            _logger.LogWarning("Clinical Alert: Abnormal Heart Rate {HR} for {device}", hr.GetDouble(), dto.DeviceCode);
             
             newAlert = new Alert
             {

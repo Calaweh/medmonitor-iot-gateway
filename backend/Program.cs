@@ -22,10 +22,10 @@ Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)    // Hide system noise
     .Enrich.FromLogContext()
     .WriteTo.Console()
-    .WriteTo.GrafanaLoki(lokiUrl, labels: new[]
-    {
-        new Serilog.Sinks.Grafana.Loki.LokiLabel { Key = "app", Value = "medmon_backend" }
-    })
+    .WriteTo.GrafanaLoki(lokiUrl, 
+        labels: new[] { new LokiLabel { Key = "app", Value = "medmon_backend" } },
+        filteredLabels: new[] { "device", "level" } // Promotes these properties to indexed labels
+    )
     .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);

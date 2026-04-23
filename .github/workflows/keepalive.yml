@@ -1,0 +1,16 @@
+name: Supabase Keep-Alive Ping
+
+on:
+  schedule:
+    # Runs at 00:00 every 3rd day
+    - cron: '0 0 */3 * *'
+  workflow_dispatch: # Allows manual trigger from GH UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call API to wake database
+        # Replace with your actual deployed API URL once hosted
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" https://your-app-name.onrender.com/api/devices
