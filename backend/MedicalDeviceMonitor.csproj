@@ -25,6 +25,9 @@
 
     <!-- OpenAPI / Swagger UI -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+
+    <!-- BCrypt for password hashing -->
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
   </ItemGroup>
 
 </Project>

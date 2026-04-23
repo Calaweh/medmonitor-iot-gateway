@@ -6,6 +6,10 @@ using DotNetEnv;
 using Serilog;
 using Serilog.Sinks.Grafana.Loki;
 using Serilog.Context;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Text;
 
 // Load .env.local and force overwrite existing env vars
 var envDict = Env.Load("../.env", new LoadOptions(
@@ -51,6 +55,22 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     })
 );
 
+// ─── JWT Authentication Setup ────────────────────────────────
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "FallbackSecretKeyThatIsAtLeast32BytesLong!";
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+
+builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 builder.Services.AddControllers();
 
@@ -67,7 +87,30 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+// ─── Swagger with JWT Support ────────────────────────────────
+builder.Services.AddSwaggerGen(c =>
+{
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 // Register ReadingService
 builder.Services.AddScoped(typeof(ReadingService));
@@ -99,6 +142,7 @@ app.Use(async (context, next) =>
 });
 
 app.UseCors("AllowFrontend");
+app.UseAuthentication(); 
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<VitalSignsHub>("/hubs/vitalsigns");

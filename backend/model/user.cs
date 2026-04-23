@@ -1,0 +1,30 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace MedicalDeviceMonitor.Models;
+
+[Table("users")]
+public class User
+{
+    [Key]
+    [Column("id")]
+    public Guid Id { get; set; }
+
+    [Column("email")]
+    public required string Email { get; set; }
+
+    [Column("password_hash")]
+    public required string PasswordHash { get; set; }
+
+    [Column("role")]
+    public required string Role { get; set; }
+
+    [Column("full_name")]
+    public required string FullName { get; set; }
+
+    [Column("is_active")]
+    public bool IsActive { get; set; } = true;
+
+    [Column("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
