@@ -51,10 +51,21 @@ public class ReadingService
 
         _db.SensorReadings.Add(reading);
 
+        Alert? newAlert = null;
         if (dto.Payload.TryGetProperty("heart_rate", out var hr) && (hr.GetDouble() > 120 || hr.GetDouble() < 40))
         {
             _logger.LogWarning("Clinical Alert: Abnormal Heart Rate {HR} for {Device}", hr.GetDouble(), dto.DeviceCode);
-            // In a real app, you'd save to an 'alerts' table here as per schema.sql
+            
+            newAlert = new Alert
+            {
+                DeviceId = device.Id,
+                Reading = reading,
+                AlertType = "ABNORMAL_HEART_RATE",
+                Severity = "CRITICAL",
+                Message = $"Abnormal Heart Rate: {hr.GetDouble()} bpm",
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.Alerts.Add(newAlert);
         }
 
         await _db.SaveChangesAsync();
@@ -68,22 +79,54 @@ public class ReadingService
             reading.RecordedAt,
             Payload = dto.Payload // Send the raw JSON payload to React
         });
+
+        if (newAlert != null)
+        {
+            await _hub.Clients.All.SendAsync("ReceiveNewAlert", new
+            {
+                newAlert.Id,
+                newAlert.DeviceId,
+                DeviceCode = device.DeviceCode,
+                newAlert.AlertType,
+                newAlert.Severity,
+                newAlert.Message,
+                newAlert.CreatedAt
+            });
+        }
     }
 
-    public async Task<IEnumerable<object>> GetHistoryAsync(string deviceCode, int limit)
+    public async Task<IEnumerable<object>> GetHistoryAsync(string deviceCode, int limit, DateTime? start, DateTime? end)
     {
-        return await _db.SensorReadings
+        var query = _db.SensorReadings
             .Include(r => r.Device)
-            .Where(r => r.Device.DeviceCode == deviceCode)
+            .Where(r => r.Device.DeviceCode == deviceCode);
+
+        // 1. Apply Date Filtering
+        if (start.HasValue) query = query.Where(r => r.RecordedAt >= start.Value.ToUniversalTime());
+        if (end.HasValue) query = query.Where(r => r.RecordedAt <= end.Value.ToUniversalTime());
+
+        var rawData = await query
             .OrderByDescending(r => r.RecordedAt)
             .Take(limit)
-            .Select(r => new {
-                r.Id,
-                r.DeviceId,
-                DeviceCode = r.Device.DeviceCode,
-                r.RecordedAt,
-                r.Payload
-            })
             .ToListAsync();
+
+        // 2. Server-Side Data Decimation (Nth-Point Downsampling)
+        // If we retrieve too many points, downsample to prevent frontend chart lag
+        const int maxChartPoints = 100;
+        if (rawData.Count > maxChartPoints)
+        {
+            int step = (int)Math.Ceiling(rawData.Count / (double)maxChartPoints);
+            rawData = rawData.Where((x, index) => index % step == 0).ToList();
+            _logger.LogInformation("Decimated history for {DeviceCode} from {Raw} to {Decimated} points", 
+                deviceCode, rawData.Count * step, rawData.Count);
+        }
+
+        return rawData.Select(r => new {
+            r.Id,
+            r.DeviceId,
+            DeviceCode = r.Device.DeviceCode,
+            r.RecordedAt,
+            r.Payload
+        });
     }
 }

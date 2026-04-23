@@ -9,6 +9,7 @@ public class AppDbContext : DbContext
 
     public DbSet<Device> Devices { get; set; }
     public DbSet<SensorReading> SensorReadings { get; set; }
+    public DbSet<Alert> Alerts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
 using Serilog;
 using Serilog.Sinks.Grafana.Loki;
+using Serilog.Context;
 
 // Load .env.local and force overwrite existing env vars
 var envDict = Env.Load("../.env", new LoadOptions(
@@ -42,7 +43,11 @@ if (string.IsNullOrEmpty(connectionString))
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
-        npgsqlOptions.CommandTimeout(10);
+        // This tells .NET: "If the DB is busy, wait a second and try again up to 3 times"
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3, 
+            maxRetryDelay: TimeSpan.FromSeconds(5), 
+            errorCodesToAdd: null);
     })
 );
 
@@ -76,6 +81,22 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.Use(async (context, next) =>
+{
+    // Try to get the Correlation ID from the Python simulator, or generate one if missing
+    var correlationId = context.Request.Headers["X-Correlation-ID"].FirstOrDefault() 
+                        ?? Guid.NewGuid().ToString();
+
+    // Push it into Serilog's Context so every log in this request shares the ID
+    using (LogContext.PushProperty("correlation_id", correlationId))
+    {
+        // Add it to the response headers for good measure
+        context.Response.Headers.Append("X-Correlation-ID", correlationId);
+        
+        await next();
+    }
+});
 
 app.UseCors("AllowFrontend");
 app.UseAuthorization();

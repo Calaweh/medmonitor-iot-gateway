@@ -5,6 +5,7 @@ import axios from "axios";
 export const useVitals = (backendUrl, deviceCode = "ICU-BED-01") => {
   const [readings, setReadings] = useState([]);
   const [latestReading, setLatestReading] = useState(null);
+  const [alerts, setAlerts] = useState([]);
 
   useEffect(() => {
     // 1. Fetch History
@@ -25,9 +26,15 @@ export const useVitals = (backendUrl, deviceCode = "ICU-BED-01") => {
       }
     });
 
+    connection.on("ReceiveNewAlert", (alertData) => {
+      if (alertData.deviceCode === deviceCode) {
+        setAlerts((prev) => [alertData, ...prev].slice(0, 10)); // Keep latest 10 alerts
+      }
+    });
+
     connection.start().catch(console.error);
     return () => connection.stop();
   }, [backendUrl, deviceCode]);
 
-  return { readings, latestReading };
+  return { readings, latestReading, alerts };
 };

@@ -32,12 +32,16 @@ public class ReadingsController : ControllerBase
     }
 
     [HttpGet("{deviceCode}/history")]
-    public async Task<IActionResult> GetHistory(string deviceCode, [FromQuery] int limit = 30)
+    public async Task<IActionResult> GetHistory(
+        string deviceCode, 
+        [FromQuery] int limit = 1000, 
+        [FromQuery] DateTime? start = null, 
+        [FromQuery] DateTime? end = null)
     {
         try
         {
-            var history = await _readingService.GetHistoryAsync(deviceCode, limit);
-            return Ok(history.Reverse()); 
+            var history = await _readingService.GetHistoryAsync(deviceCode, limit, start, end);
+            return Ok(history.Reverse()); // Return chronologically for charts
         }
         catch (Exception ex)
         {

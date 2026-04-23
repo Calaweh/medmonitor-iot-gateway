@@ -63,7 +63,7 @@ node_modules/
 
 # ─── Supabase ────────────────────────────────────────────────
 supabase.toml
-supabase/
+supabase/.temp
 
 # ─── Docs ────────────────────────────────────────────────────
 docs/personal_memorandum.txt
