@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import * as signalR from "@microsoft/signalr";
 import axios from "axios";
 
-export const useVitals = (backendUrl, deviceCode) => {
+export const useVitals = (backendUrl, deviceCode, token) => { 
   const [readings, setReadings] = useState([]);
   const [latestReading, setLatestReading] = useState(null);
   const [alerts, setAlerts] = useState([]);
 
   useEffect(() => {
-    if (!deviceCode) return; // Don't fetch if no device is selected
+    if (!deviceCode || !token) return; // Don't fetch if no device is selected or not authed
 
     // Reset state when switching patients
     setReadings([]);
@@ -16,18 +16,24 @@ export const useVitals = (backendUrl, deviceCode) => {
     setAlerts([]);
 
     // 1. Fetch History for selected device
-    axios.get(`${backendUrl}/api/readings/${deviceCode}/history`)
+    axios.get(`${backendUrl}/api/readings/${deviceCode}/history`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(res => setReadings(res.data))
       .catch(err => console.error("History fetch failed", err));
 
     // Fetch active alerts for this device
-    axios.get(`${backendUrl}/api/alerts?deviceCode=${deviceCode}`)
+    axios.get(`${backendUrl}/api/alerts?deviceCode=${deviceCode}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(res => setAlerts(res.data))
       .catch(err => console.error("Alerts fetch failed", err));
 
     // 2. Setup Real-time connection
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(`${backendUrl}/hubs/vitalsigns`)
+      .withUrl(`${backendUrl}/hubs/vitalsigns`, {
+        accessTokenFactory: () => token 
+      })
       .withAutomaticReconnect()
       .build();
 
@@ -48,7 +54,7 @@ export const useVitals = (backendUrl, deviceCode) => {
     connection.start().catch(console.error);
 
     return () => connection.stop();
-  }, [backendUrl, deviceCode]); // Re-run whenever deviceCode changes
+  }, [backendUrl, deviceCode, token]); // Re-run whenever deviceCode or token changes
 
   return { readings, latestReading, alerts };
 };

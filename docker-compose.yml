@@ -22,7 +22,7 @@ services:
       dockerfile: Dockerfile
     container_name: medmon_backend
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_ENVIRONMENT=Development   
       - ConnectionStrings__Supabase=${SUPABASE_CONN_STRING}
       - Jwt__Secret=${JWT_SECRET}
       - Jwt__Issuer=${JWT_ISSUER}

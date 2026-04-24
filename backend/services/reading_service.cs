@@ -8,7 +8,6 @@ using Serilog;
 
 namespace MedicalDeviceMonitor.Services;
 
-// The DTO matching your Python script's JSON payload
 public class IngestReadingDto
 {
     public required string DeviceCode { get; set; }
@@ -20,7 +19,7 @@ public class ReadingService
 {
     private readonly AppDbContext _db;
     private readonly IHubContext<VitalSignsHub> _hub;
-    private readonly ILogger<ReadingService> _logger; 
+    private readonly ILogger<ReadingService> _logger;
 
     public ReadingService(AppDbContext db, IHubContext<VitalSignsHub> hub, ILogger<ReadingService> logger)
     {
@@ -31,77 +30,119 @@ public class ReadingService
 
     public async Task ProcessNewReadingAsync(IngestReadingDto dto)
     {
-        // 1. Find the device by code
         var device = await _db.Devices.FirstOrDefaultAsync(d => d.DeviceCode == dto.DeviceCode);
-        
-        if (device == null) {
+        if (device == null)
+        {
             _logger.LogWarning("Abnormal Event: Received data for unknown device {DeviceCode}", dto.DeviceCode);
             throw new Exception($"Device {dto.DeviceCode} not found.");
         }
 
-        Log.Information("Processing reading for {device}. HR: {HR}", dto.DeviceCode, dto.Payload.GetProperty("heart_rate"));
+        // 1. Get the LAST reading before we save the new one (used for Rate of Change alerts)
+        var lastReading = await _db.SensorReadings
+            .Where(r => r.DeviceId == device.Id)
+            .OrderByDescending(r => r.RecordedAt)
+            .FirstOrDefaultAsync();
 
-        // 2. Save to PostgreSQL
+        // 2. Save new reading to PostgreSQL
         var reading = new SensorReading
         {
             DeviceId = device.Id,
-            RecordedAt = dto.RecordedAt.ToUniversalTime(), 
-            Payload = JsonDocument.Parse(dto.Payload.GetRawText()) 
+            RecordedAt = dto.RecordedAt.ToUniversalTime(),
+            Payload = JsonDocument.Parse(dto.Payload.GetRawText())
         };
-
         _db.SensorReadings.Add(reading);
 
-        Alert? newAlert = null;
-        if (dto.Payload.TryGetProperty("heart_rate", out var hr) && (hr.GetDouble() > 120 || hr.GetDouble() < 40))
+        // 3. CLINICAL LOGIC & ALARM FATIGUE MANAGEMENT
+        var activeAlertsToSave = new List<Alert>();
+        
+        // Fetch alerts triggered in the last 5 minutes for this device
+        var recentAlertTypes = await _db.Alerts
+            .Where(a => a.DeviceId == device.Id && a.CreatedAt >= DateTime.UtcNow.AddMinutes(-5))
+            .Select(a => a.AlertType)
+            .ToListAsync();
+
+        // Rule A: Absolute Heart Rate
+        if (dto.Payload.TryGetProperty("heart_rate", out var hr))
         {
-            _logger.LogWarning("Clinical Alert: Abnormal Heart Rate {HR} for {device}", hr.GetDouble(), dto.DeviceCode);
-            
-            newAlert = new Alert
+            double currentHr = hr.GetDouble();
+            if ((currentHr > 120 || currentHr < 40) && !recentAlertTypes.Contains("ABNORMAL_HEART_RATE"))
             {
-                DeviceId = device.Id,
-                Reading = reading,
-                AlertType = "ABNORMAL_HEART_RATE",
-                Severity = "CRITICAL",
-                Message = $"Abnormal Heart Rate: {hr.GetDouble()} bpm",
-                CreatedAt = DateTime.UtcNow
-            };
-            _db.Alerts.Add(newAlert);
+                activeAlertsToSave.Add(CreateAlert(device.Id, reading, "ABNORMAL_HEART_RATE", "CRITICAL", $"Abnormal Heart Rate: {currentHr} bpm"));
+            }
+
+            // Rule B: Rate of Change (Spike/Drop > 20 BPM instantly)
+            if (lastReading != null && lastReading.Payload.RootElement.TryGetProperty("heart_rate", out var lastHr))
+            {
+                if (Math.Abs(currentHr - lastHr.GetDouble()) >= 20 && !recentAlertTypes.Contains("SUDDEN_HR_CHANGE"))
+                {
+                    activeAlertsToSave.Add(CreateAlert(device.Id, reading, "SUDDEN_HR_CHANGE", "WARNING", $"Sudden HR change detected. Jumped by {Math.Abs(currentHr - lastHr.GetDouble())} bpm."));
+                }
+            }
+        }
+
+        // Rule C: SpO2 Drop
+        if (dto.Payload.TryGetProperty("spo2", out var spo2))
+        {
+            double currentSpo2 = spo2.GetDouble();
+            if (currentSpo2 < 90 && !recentAlertTypes.Contains("LOW_SPO2"))
+            {
+                activeAlertsToSave.Add(CreateAlert(device.Id, reading, "LOW_SPO2", "CRITICAL", $"Critical SpO2 Level: {currentSpo2}%"));
+            }
+        }
+
+        // Add any newly triggered alerts to the database
+        if (activeAlertsToSave.Any())
+        {
+            _db.Alerts.AddRange(activeAlertsToSave);
         }
 
         await _db.SaveChangesAsync();
 
-        // 3. Broadcast to React Frontend via SignalR WebSocket
-        await _hub.Clients.All.SendAsync("ReceiveNewReading", new 
+        // 4. Broadcast to React Frontend via SignalR
+        await _hub.Clients.All.SendAsync("ReceiveNewReading", new
         {
             reading.Id,
             reading.DeviceId,
             device.DeviceCode,
             reading.RecordedAt,
-            Payload = dto.Payload // Send the raw JSON payload to React
+            Payload = dto.Payload
         });
 
-        if (newAlert != null)
+        foreach (var alert in activeAlertsToSave)
         {
+            _logger.LogWarning("Clinical Alert Triggered: {Type} for {Device}", alert.AlertType, device.DeviceCode);
             await _hub.Clients.All.SendAsync("ReceiveNewAlert", new
             {
-                newAlert.Id,
-                newAlert.DeviceId,
+                alert.Id,
+                alert.DeviceId,
                 DeviceCode = device.DeviceCode,
-                newAlert.AlertType,
-                newAlert.Severity,
-                newAlert.Message,
-                newAlert.CreatedAt
+                alert.AlertType,
+                alert.Severity,
+                alert.Message,
+                alert.CreatedAt
             });
         }
+    }
+
+    private Alert CreateAlert(Guid deviceId, SensorReading reading, string type, string severity, string message)
+    {
+        return new Alert
+        {
+            DeviceId = deviceId,
+            Reading = reading,
+            AlertType = type,
+            Severity = severity,
+            Message = message,
+            CreatedAt = DateTime.UtcNow
+        };
     }
 
     public async Task<IEnumerable<object>> GetHistoryAsync(string deviceCode, int limit, DateTime? start, DateTime? end)
     {
         var query = _db.SensorReadings
             .Include(r => r.Device)
-            .Where(r => r.Device.DeviceCode == deviceCode);
+            .Where(r => r.Device!.DeviceCode == deviceCode);
 
-        // 1. Apply Date Filtering
         if (start.HasValue) query = query.Where(r => r.RecordedAt >= start.Value.ToUniversalTime());
         if (end.HasValue) query = query.Where(r => r.RecordedAt <= end.Value.ToUniversalTime());
 
@@ -110,21 +151,17 @@ public class ReadingService
             .Take(limit)
             .ToListAsync();
 
-        // 2. Server-Side Data Decimation (Nth-Point Downsampling)
-        // If we retrieve too many points, downsample to prevent frontend chart lag
         const int maxChartPoints = 100;
         if (rawData.Count > maxChartPoints)
         {
             int step = (int)Math.Ceiling(rawData.Count / (double)maxChartPoints);
             rawData = rawData.Where((x, index) => index % step == 0).ToList();
-            _logger.LogInformation("Decimated history for {DeviceCode} from {Raw} to {Decimated} points", 
-                deviceCode, rawData.Count * step, rawData.Count);
         }
 
         return rawData.Select(r => new {
             r.Id,
             r.DeviceId,
-            DeviceCode = r.Device.DeviceCode,
+            DeviceCode = r.Device!.DeviceCode,
             r.RecordedAt,
             r.Payload
         });

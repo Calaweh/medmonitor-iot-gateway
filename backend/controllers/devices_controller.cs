@@ -1,9 +1,11 @@
 using MedicalDeviceMonitor.Data;
+using Microsoft.AspNetCore.Authorization; 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace MedicalDeviceMonitor.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class DevicesController : ControllerBase

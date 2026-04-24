@@ -28,7 +28,7 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .WriteTo.GrafanaLoki(lokiUrl, 
         labels: new[] { new LokiLabel { Key = "app", Value = "medmon_backend" } },
-        filteredLabels: new[] { "device", "level" } // Promotes these properties to indexed labels
+        propertiesAsLabels: new[] { "device", "level" } // Promotes these properties to indexed labels
     )
     .CreateLogger();
 
@@ -56,7 +56,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );
 
 // ─── JWT Authentication Setup ────────────────────────────────
-var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "FallbackSecretKeyThatIsAtLeast32BytesLong!";
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") 
+                ?? builder.Configuration["Jwt:Secret"] 
+                ?? "FallbackSecretKeyThatIsAtLeast32BytesLong!";
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -67,6 +69,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = false,
             ValidateAudience = false,
             ClockSkew = TimeSpan.Zero
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                // If the request is for our hub, read the token from the query string
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/vitalsigns"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 

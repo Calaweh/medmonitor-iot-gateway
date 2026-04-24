@@ -1,8 +1,10 @@
 using MedicalDeviceMonitor.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace MedicalDeviceMonitor.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ReadingsController : ControllerBase
@@ -16,6 +18,7 @@ public class ReadingsController : ControllerBase
         _logger = logger;
     }
 
+    [AllowAnonymous]
     [HttpPost("ingest")]
     public async Task<IActionResult> IngestData([FromBody] IngestReadingDto dto)
     {

@@ -1,21 +1,71 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useVitals } from './hooks/useVitals';
+import Login from './Login';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Activity, Heart, Thermometer, AlertTriangle, CheckCircle2, Bed, Building2 } from 'lucide-react';
+import { Activity, Heart, Thermometer, AlertTriangle, CheckCircle2, Bed, Building2, LogOut } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
 function App() {
+
+  const [token, setToken] = useState(localStorage.getItem('jwt'));
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user_data')));
+  
   const [devices, setDevices] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState(null);
 
+  // Sync axios headers whenever token changes
+  useEffect(() => {
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      localStorage.setItem('jwt', token);
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
+      localStorage.removeItem('jwt');
+    }
+  }, [token]);
+
+  // Sync user data to localStorage
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('user_data', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('user_data');
+    }
+  }, [user]);
+
+  // Helper to handle login success
+  const handleAuth = (jwt, userData) => {
+    // Set header immediately to prevent race conditions in subsequent fetches
+    axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+    setToken(jwt);
+    setUser(userData);
+  };
+
+  // Helper to handle logout
+  const handleLogout = () => {
+    setToken(null);
+    setUser(null);
+    setSelectedDevice(null);
+    delete axios.defaults.headers.common['Authorization'];
+  };
+
   // Fetch all devices/sites on load
   useEffect(() => {
-    axios.get(`${BACKEND_URL}/api/devices`)
+    if (!token) return;
+
+    // Use explicit header for the first fetch to ensure it doesn't fail 
+    // while the global axios default is being synchronized
+    axios.get(`${BACKEND_URL}/api/devices`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(res => setDevices(res.data))
-      .catch(err => console.error("Failed to load devices", err));
-  }, []);
+      .catch(err => {
+        console.error("Failed to load devices", err);
+        if (err.response?.status === 401) handleLogout(); 
+      });
+  }, [token]);
 
   // Group devices by Site/Location
   const sites = useMemo(() => {
@@ -28,9 +78,13 @@ function App() {
     return groups;
   }, [devices]);
 
+  // --- RENDER LOGIN IF NOT AUTHENTICATED ---
+  if (!token) {
+    return <Login setAuth={handleAuth} backendUrl={BACKEND_URL} />;
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-200">
-      
       {/* SIDEBAR: Sites & Patients */}
       <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col">
         <div className="p-6 border-b border-slate-800">
@@ -39,6 +93,19 @@ function App() {
           </h1>
           <p className="text-xs text-slate-500 mt-1">Multi-Site Command Center</p>
         </div>
+        
+        {/* LOGGED IN USER INFO */}
+        <div className="p-4 border-b border-slate-800 bg-slate-800/30 flex justify-between items-center">
+          <div>
+            <div className="text-sm font-semibold">{user?.fullName}</div>
+            <div className="text-[10px] text-emerald-400 uppercase tracking-wide">{user?.role}</div>
+          </div>
+          <button onClick={handleLogout} className="p-2 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition">
+            <LogOut size={16} />
+          </button>
+        </div>
+
+        {/* ... Keep the rest of your aside list rendering the same ... */}
         <div className="overflow-y-auto flex-grow p-4 space-y-6">
           {Object.entries(sites).map(([siteName, beds]) => (
             <div key={siteName}>
@@ -72,22 +139,12 @@ function App() {
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 overflow-y-auto">
         {selectedDevice ? (
-          <PatientDetail deviceCode={selectedDevice} />
+          <PatientDetail deviceCode={selectedDevice} token={token} />
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-slate-500">
             <Activity size={48} className="mb-4 opacity-20" />
             <h2 className="text-xl font-medium text-slate-400">No Patient Selected</h2>
             <p className="text-sm mt-2">Select a bed from the sidebar to view real-time telemetry.</p>
-            <div className="mt-8 flex gap-8 text-center">
-              <div>
-                <p className="text-3xl font-bold text-slate-300">{Object.keys(sites).length}</p>
-                <p className="text-xs uppercase tracking-wider mt-1">Active Sites</p>
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-slate-300">{devices.length}</p>
-                <p className="text-xs uppercase tracking-wider mt-1">Monitored Beds</p>
-              </div>
-            </div>
           </div>
         )}
       </main>
@@ -96,8 +153,9 @@ function App() {
 }
 
 // Extracted Component for the detailed patient view
-function PatientDetail({ deviceCode }) {
-  const { readings, latestReading, alerts } = useVitals(BACKEND_URL, deviceCode);
+function PatientDetail({ deviceCode, token }) { 
+  const { readings, latestReading, alerts } = useVitals(BACKEND_URL, deviceCode, token); 
+  
   const payload = latestReading?.payload || {};
 
   const alertState = useMemo(() => {
