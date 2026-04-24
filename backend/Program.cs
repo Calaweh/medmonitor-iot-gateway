@@ -153,7 +153,7 @@ builder.Services.AddScoped<AuditService>();
 
 // Hangfire for scheduled jobs
 builder.Services.AddHangfire(config =>
-    config.UsePostgreSqlStorage(connectionString));
+    config.UsePostgreSqlStorage(options => options.UseNpgsqlConnection(connectionString)));
 builder.Services.AddHangfireServer();
 
 // Register the retention job as a service
@@ -221,44 +221,52 @@ app.UseAuthorization();
 
 app.Use(async (context, next) =>
 {
-    var userId = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    var userIdString = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     var userRole = context.User?.FindFirst(ClaimTypes.Role)?.Value;
 
     try
     {
-        if (userId != null)
+        if (!string.IsNullOrEmpty(userIdString) && Guid.TryParse(userIdString, out var userId))
         {
-            if (userRole == "admin")
+            var securityContext = new UserAccessContext
             {
-                // Bypass filter entirely for admins
-                WardContext.AllowedLocations = null; 
-            }
-            else
+                IsAdmin = (userRole == "admin")
+            };
+
+            // If not an admin, we load their explicitly assigned, active policies
+            if (!securityContext.IsAdmin)
             {
                 using var scope = context.RequestServices.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var locations = await db.Set<WardAssignment>()
-                    .Where(w => w.UserId == Guid.Parse(userId))
-                    .Select(w => w.Location)
-                    .Distinct()
-                    .ToListAsync();
                 
-                // If they have no locations assigned, this empty list correctly blocks all queries
-                WardContext.AllowedLocations = locations; 
+                var now = DateTime.UtcNow;
+                
+                // Fetch policies where IsActive is TRUE (unlocked) 
+                // AND (ExpiresAt is null OR hasn't expired yet)
+                securityContext.Policies = await db.Set<AccessPolicy>()
+                    .Where(p => p.UserId == userId 
+                             && p.IsActive 
+                             && (p.ExpiresAt == null || p.ExpiresAt > now))
+                    .ToListAsync();
             }
+
+            SecurityContext.Current = securityContext;
         }
         else
         {
-            // Fallback for unauthenticated or system requests
-            WardContext.AllowedLocations = null;
+            // Unauthenticated or system-level request
+            SecurityContext.Current = null;
         }
 
+        // Proceed to Controllers / SignalR Hubs
         await next();
     }
     finally
     {
-        // CRITICAL: Prevent leaking the previous user's locations to the next request on the same thread
-        WardContext.AllowedLocations = null; 
+        // CRITICAL: Wipe the AsyncLocal context at the end of the HTTP request.
+        // This prevents thread pollution, ensuring User A's policies don't leak 
+        // into User B's request when Kestrel reuses the thread.
+        SecurityContext.Current = null;
     }
 });
 

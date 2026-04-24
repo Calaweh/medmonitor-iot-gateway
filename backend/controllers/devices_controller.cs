@@ -21,7 +21,10 @@ public class DevicesController : ControllerBase
             .Select(d => new {
                 d.Id,
                 d.DeviceCode,
-                d.Location,
+                d.Site,
+                d.Department,
+                d.Room,
+                d.Labels,
                 d.Description,
                 CurrentAssignment = _db.BedAssignments
                     .Include(b => b.Patient)

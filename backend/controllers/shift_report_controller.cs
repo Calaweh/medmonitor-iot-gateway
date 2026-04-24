@@ -108,23 +108,26 @@ public class ShiftReportController : ControllerBase
 
     private static void ComposeHeader(IContainer container)
     {
-        container.Row(row =>
+        container.Column(col =>
         {
-            row.RelativeItem().Column(col =>
+            col.Item().Row(row =>
             {
-                col.Item().Text("MedMonitor Command Centre")
-                    .FontSize(18).Bold().FontColor(Colors.Teal.Darken2);
-                col.Item().Text("Clinical Shift Handover Report")
-                    .FontSize(12).FontColor(Colors.Grey.Darken1);
+                row.RelativeItem().Column(c =>
+                {
+                    c.Item().Text("MedMonitor Command Centre")
+                        .FontSize(18).Bold().FontColor(Colors.Teal.Darken2);
+                    c.Item().Text("Clinical Shift Handover Report")
+                        .FontSize(12).FontColor(Colors.Grey.Darken1);
+                });
+                row.ConstantItem(120).AlignRight().Column(c =>
+                {
+                    c.Item().Background(Colors.Red.Lighten4).Padding(3).Text("SYNTHETIC DATA")
+                        .FontSize(8).Bold().FontColor(Colors.Red.Medium);
+                });
             });
-            row.ConstantItem(120).AlignRight().Column(col =>
-            {
-                col.Item().Background(Colors.Red.Lighten4).Padding(3).Text("SYNTHETIC DATA")
-                    .FontSize(8).Bold().FontColor(Colors.Red.Medium);
-            });
-        });
 
-        container.PaddingTop(4).LineHorizontal(1).LineColor(Colors.Teal.Darken2);
+            col.Item().PaddingTop(4).LineHorizontal(1).LineColor(Colors.Teal.Darken2);
+        });
     }
 
     private static void ComposeContent(

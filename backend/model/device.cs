@@ -15,10 +15,19 @@ public class Device
 
     [Column("description")]
     public string? Description { get; set; }
-
-    [Column("location")]
-    public string? Location { get; set; }
-
+    
+    [Column("site")] 
+    public string? Site { get; set; }
+    
+    [Column("department")] 
+    public string? Department { get; set; }
+    
+    [Column("room")] 
+    public string? Room { get; set; }
+    
+    [Column("labels", TypeName = "text[]")] 
+    public string[] Labels { get; set; } = Array.Empty<string>();
+    
     [Column("is_active")]
     public bool IsActive { get; set; }
 }

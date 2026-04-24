@@ -67,6 +67,7 @@ supabase/.temp
 
 # ─── Docs ────────────────────────────────────────────────────
 docs/personal_memorandum.txt
+docs/architecture_explanation.md
 
 # ─── Other ───────────────────────────────────────────────────
 *.bak

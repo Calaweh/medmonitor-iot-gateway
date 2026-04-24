@@ -71,7 +71,11 @@ function App() {
   const sites = useMemo(() => {
     const groups = {};
     devices.forEach(d => {
-      const loc = d.location || 'Unassigned Site';
+      // Create a display label like "General Hospital - ICU"
+      const loc = d.site 
+        ? `${d.site}${d.department ? ` — ${d.department}` : ''}` 
+        : 'Unassigned Site';
+        
       if (!groups[loc]) groups[loc] = [];
       groups[loc].push(d);
     });
