@@ -24,6 +24,12 @@ public class User
 
     [Column("is_active")]
     public bool IsActive { get; set; } = true;
+    
+    [Column("totp_secret")]
+    public string? TotpSecret { get; set; }
+    
+    [Column("is_totp_enabled")]
+    public bool IsTotpEnabled { get; set; } = false;
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

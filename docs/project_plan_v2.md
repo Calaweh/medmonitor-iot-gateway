@@ -261,7 +261,7 @@ File: supabase/migrations/20260423000000_v2_clinical_schema.sql
 | Sprint | Deliverable | Key Files |
 |--------|-------------|-----------|
 | **S0 — Production Hardening** | ✅ Add department isolation (user + device). Implement EF Core global query filter. Add data retention purge job (Hangfire). Enforce alert resolution ward check. | `AppDbContext.cs`, `AlertsController.cs`, `RetentionService.cs`, migration SQL |
-| **S1 — Security Hardening** | ✅ Hash‑chained audit log integrity (HMAC). ✅ Document Supabase TDE at rest. 2FA / TOTP clinician login plan. | `AuditService.cs`, `SecurityDocs.md`, `AuthController.cs` |
+| **S1 — Security Hardening** | ✅ Hash‑chained audit log integrity (HMAC). ✅ Document Supabase TDE at rest. ✅ 2FA / TOTP clinician login plan. | `AuditService.cs`, `SecurityDocs.md`, `AuthController.cs` |
 | **S2 — Foundation** | Run migration. Seed patients from CSV. Add users table + bcrypt login endpoint. Wire `[Authorize]` on all controllers.                     | `migration SQL`, `AuthController.cs`, `LoginPage.jsx` |
 | **S3 — Clinical**   | Patient thresholds table + `ReadingService` lookup. SpO2 backend alert. Trend rate-of-change alert. Alert suppression window.              | `ReadingService.cs`, `patient_thresholds migration`   |
 | **S4 — Dashboard**  | React: patient name + diagnosis in sidebar. Multi-vital chart (HR, SpO2, Resp, BP, Temp). Alert acknowledge button (logged to audit\_log). | `App.jsx`, `PatientDetail.jsx`, `useVitals.js`        |
@@ -321,7 +321,7 @@ medical-device-monitoring/
 ### ✅ Phase 4: Security & Compliance (P1 – High)
 - [x] Hash‑chained audit log integrity (HMAC verification)
 - [x] Document Supabase TDE at rest
-- [ ] 2FA / TOTP for clinician login
+- [x] 2FA / TOTP for clinician login
 
 ### 🟡 Phase 5: Clinical Completeness (P2)
 - [ ] Medication schedules table + alert for missed doses

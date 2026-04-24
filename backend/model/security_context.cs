@@ -5,9 +5,7 @@ namespace MedicalDeviceMonitor.Services;
 public class UserAccessContext
 {
     public bool IsAdmin { get; set; }
-    
-    // Holds the evaluated rules for the current request
-    public List<AccessPolicy> Policies { get; set; } = new();
+    public Guid UserId { get; set; }
 }
 
 public static class SecurityContext

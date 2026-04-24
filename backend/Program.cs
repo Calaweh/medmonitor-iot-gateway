@@ -228,29 +228,11 @@ app.Use(async (context, next) =>
     {
         if (!string.IsNullOrEmpty(userIdString) && Guid.TryParse(userIdString, out var userId))
         {
-            var securityContext = new UserAccessContext
+            SecurityContext.Current = new UserAccessContext
             {
-                IsAdmin = (userRole == "admin")
+                IsAdmin = (userRole == "admin"),
+                UserId = userId
             };
-
-            // If not an admin, we load their explicitly assigned, active policies
-            if (!securityContext.IsAdmin)
-            {
-                using var scope = context.RequestServices.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                
-                var now = DateTime.UtcNow;
-                
-                // Fetch policies where IsActive is TRUE (unlocked) 
-                // AND (ExpiresAt is null OR hasn't expired yet)
-                securityContext.Policies = await db.Set<AccessPolicy>()
-                    .Where(p => p.UserId == userId 
-                             && p.IsActive 
-                             && (p.ExpiresAt == null || p.ExpiresAt > now))
-                    .ToListAsync();
-            }
-
-            SecurityContext.Current = securityContext;
         }
         else
         {

@@ -33,70 +33,67 @@ public class AppDbContext : DbContext
         // JSONB mapping
         modelBuilder.Entity<SensorReading>().Property(e => e.Payload).HasColumnType("jsonb");
 
-        // ─── ABAC / Multi-Tenant Isolation Filters ──────────────────────────────────────
-        // Devices Filter
+        var now = DateTime.UtcNow;
+
         modelBuilder.Entity<Device>().HasQueryFilter(d =>
             SecurityContext.Current != null && (
                 SecurityContext.Current.IsAdmin || 
-                SecurityContext.Current.Policies.Any(p => 
+                AccessPolicies.Any(p => 
+                    p.UserId == SecurityContext.Current.UserId && p.IsActive && 
+                    (p.ExpiresAt == null || p.ExpiresAt > now) &&
                     (
                         (p.AllowedSite == null || p.AllowedSite == d.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == d.Department) &&
-                        (p.AllowedRoom == null || p.AllowedRoom == d.Room)
-                    ) ||
-                    (
-                        p.AllowedLabels != null && d.Labels != null && p.AllowedLabels.Any(l => d.Labels.Contains(l))
+                        (p.AllowedRoom == null || p.AllowedRoom == d.Room) ||
+                        (p.AllowedLabels != null && p.AllowedLabels.Any(l => d.Labels.Contains(l)))
                     )
                 )
             )
         );
 
-        // Alerts Filter (via a.Device)
         modelBuilder.Entity<Alert>().HasQueryFilter(a =>
             SecurityContext.Current != null && (
                 SecurityContext.Current.IsAdmin || 
-                SecurityContext.Current.Policies.Any(p => 
+                AccessPolicies.Any(p => 
+                    p.UserId == SecurityContext.Current.UserId && p.IsActive && 
+                    (p.ExpiresAt == null || p.ExpiresAt > now) &&
                     (
                         (p.AllowedSite == null || p.AllowedSite == a.Device!.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == a.Device!.Department) &&
-                        (p.AllowedRoom == null || p.AllowedRoom == a.Device!.Room)
-                    ) ||
-                    (
-                        p.AllowedLabels != null && a.Device!.Labels != null && p.AllowedLabels.Any(l => a.Device!.Labels.Contains(l))
+                        (p.AllowedRoom == null || p.AllowedRoom == a.Device!.Room) ||
+                        (p.AllowedLabels != null && p.AllowedLabels.Any(l => a.Device!.Labels.Contains(l)))
                     )
                 )
             )
         );
         
-        // SensorReadings Filter (via r.Device)
         modelBuilder.Entity<SensorReading>().HasQueryFilter(r =>
             SecurityContext.Current != null && (
                 SecurityContext.Current.IsAdmin || 
-                SecurityContext.Current.Policies.Any(p => 
+                AccessPolicies.Any(p => 
+                    p.UserId == SecurityContext.Current.UserId && p.IsActive && 
+                    (p.ExpiresAt == null || p.ExpiresAt > now) &&
                     (
                         (p.AllowedSite == null || p.AllowedSite == r.Device!.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == r.Device!.Department) &&
-                        (p.AllowedRoom == null || p.AllowedRoom == r.Device!.Room)
-                    ) ||
-                    (
-                        p.AllowedLabels != null && r.Device!.Labels != null && p.AllowedLabels.Any(l => r.Device!.Labels.Contains(l))
+                        (p.AllowedRoom == null || p.AllowedRoom == r.Device!.Room) ||
+                        (p.AllowedLabels != null && p.AllowedLabels.Any(l => r.Device!.Labels.Contains(l)))
                     )
                 )
             )
         );
 
-        // BedAssignments Filter (via b.Device)
         modelBuilder.Entity<BedAssignment>().HasQueryFilter(b =>
             SecurityContext.Current != null && (
                 SecurityContext.Current.IsAdmin || 
-                SecurityContext.Current.Policies.Any(p => 
+                AccessPolicies.Any(p => 
+                    p.UserId == SecurityContext.Current.UserId && p.IsActive && 
+                    (p.ExpiresAt == null || p.ExpiresAt > now) &&
                     (
                         (p.AllowedSite == null || p.AllowedSite == b.Device!.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == b.Device!.Department) &&
-                        (p.AllowedRoom == null || p.AllowedRoom == b.Device!.Room)
-                    ) ||
-                    (
-                        p.AllowedLabels != null && b.Device!.Labels != null && p.AllowedLabels.Any(l => b.Device!.Labels.Contains(l))
+                        (p.AllowedRoom == null || p.AllowedRoom == b.Device!.Room) ||
+                        (p.AllowedLabels != null && p.AllowedLabels.Any(l => b.Device!.Labels.Contains(l)))
                     )
                 )
             )

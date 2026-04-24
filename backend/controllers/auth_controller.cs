@@ -1,10 +1,12 @@
 using MedicalDeviceMonitor.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using OtpNet;
 
 namespace MedicalDeviceMonitor.Controllers;
 
@@ -12,6 +14,12 @@ public class LoginDto
 {
     public required string Email { get; set; }
     public required string Password { get; set; }
+    public string? TwoFactorCode { get; set; }
+}
+
+public class Verify2FADto
+{
+    public required string Code { get; set; }
 }
 
 [ApiController]
@@ -52,10 +60,21 @@ public class AuthController : ControllerBase
         bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
         
         if (!isPasswordValid)
-            return Unauthorized(new { error = "Invalid password." });
+            return Unauthorized(new { error = "Invalid credentials." });
+
+        // --- 2FA ENFORCEMENT ---
+        if (user.IsTotpEnabled)
+        {
+            if (string.IsNullOrEmpty(request.TwoFactorCode))
+                return Unauthorized(new { error = "2FA_REQUIRED", message = "Two-factor authentication code required." });
+
+            var totp = new Totp(Base32Encoding.ToBytes(user.TotpSecret));
+            // Allows a 1-step drift (30 seconds before/after) to account for slight clock desync
+            if (!totp.VerifyTotp(request.TwoFactorCode, out long timeStepMatched, window: new VerificationWindow(1, 1)))
+                return Unauthorized(new { error = "INVALID_2FA", message = "Invalid or expired 2FA code." });
+        }
 
         var token = GenerateJwtToken(user);
-        
         _logger.LogInformation("User {Email} logged in successfully.", user.Email);
         
         return Ok(new 
@@ -63,6 +82,52 @@ public class AuthController : ControllerBase
             Token = token,
             User = new { user.Id, user.Email, user.FullName, user.Role }
         });
+    }
+
+    [Authorize]
+    [HttpPost("setup-2fa")]
+    public async Task<IActionResult> Setup2FA()
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var user = await _db.Users.FindAsync(userId);
+        
+        if (user == null) return NotFound();
+
+        // Generate a new base32 20-byte secret
+        var secretKey = KeyGeneration.GenerateRandomKey(20);
+        var base32Secret = Base32Encoding.ToString(secretKey);
+        
+        user.TotpSecret = base32Secret;
+        user.IsTotpEnabled = false; // Remains false until they successfully verify
+        await _db.SaveChangesAsync();
+        
+        // Return the URI that QR code generators (or Authenticator apps) consume
+        var uri = $"otpauth://totp/MedMonitor:{user.Email}?secret={base32Secret}&issuer=MedMonitor";
+        
+        return Ok(new { secret = base32Secret, uri = uri });
+    }
+
+    [Authorize]
+    [HttpPost("verify-2fa-setup")]
+    public async Task<IActionResult> Verify2FASetup([FromBody] Verify2FADto request)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var user = await _db.Users.FindAsync(userId);
+        
+        if (user == null || string.IsNullOrEmpty(user.TotpSecret)) 
+            return BadRequest(new { error = "Setup 2FA first." });
+
+        var totp = new Totp(Base32Encoding.ToBytes(user.TotpSecret));
+        
+        if (totp.VerifyTotp(request.Code, out long _))
+        {
+            user.IsTotpEnabled = true;
+            await _db.SaveChangesAsync();
+            _logger.LogInformation("User {Email} successfully enabled 2FA.", user.Email);
+            return Ok(new { message = "Two-factor authentication successfully enabled." });
+        }
+        
+        return BadRequest(new { error = "Invalid verification code." });
     }
 
     private string GenerateJwtToken(Models.User user)

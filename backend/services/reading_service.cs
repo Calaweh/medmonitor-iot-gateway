@@ -38,36 +38,36 @@ public class ReadingService
 
     public async Task ProcessNewReadingAsync(IngestReadingDto dto)
     {
-        var device = await _db.Devices.FirstOrDefaultAsync(d => d.DeviceCode == dto.DeviceCode);
+        // IgnoreQueryFilters() ensures System background processes can read data regardless of ABAC policies
+        var device = await _db.Devices.IgnoreQueryFilters().FirstOrDefaultAsync(d => d.DeviceCode == dto.DeviceCode);
         if (device == null)
         {
             _logger.LogWarning("Abnormal Event: Received data for unknown device {DeviceCode}", dto.DeviceCode);
             throw new Exception($"Device {dto.DeviceCode} not found.");
         }
-
+        
         // 1. Get last reading (for Rate-of-Change alerts)
-        var lastReading = await _db.SensorReadings
+        var lastReading = await _db.SensorReadings.IgnoreQueryFilters()
             .Where(r => r.DeviceId == device.Id)
             .OrderByDescending(r => r.RecordedAt)
             .FirstOrDefaultAsync();
-
+            
         // 2. Resolve current patient (for per-patient thresholds)
-        var currentAssignment = await _db.BedAssignments
+        var currentAssignment = await _db.BedAssignments.IgnoreQueryFilters()
             .Where(b => b.DeviceId == device.Id && b.DischargedAt == null)
             .FirstOrDefaultAsync();
-
-        // 3. Load per-patient threshold overrides (P1 gap — now implemented)
+            
+        // 3. Load per-patient threshold overrides
         Dictionary<string, (double? Min, double? Max)> patientThresholds = new();
         if (currentAssignment != null)
         {
-            var thresholdRows = await _db.Set<PatientThreshold>()
+            var thresholdRows = await _db.Set<PatientThreshold>().IgnoreQueryFilters()
                 .Where(t => t.PatientId == currentAssignment.PatientId)
                 .ToListAsync();
-
             foreach (var row in thresholdRows)
                 patientThresholds[row.VitalSign] = (row.MinValue, row.MaxValue);
         }
-
+        
         // 4. Save new reading
         var reading = new SensorReading
         {
@@ -76,12 +76,11 @@ public class ReadingService
             Payload = JsonDocument.Parse(dto.Payload.GetRawText())
         };
         _db.SensorReadings.Add(reading);
-
+        
         // 5. CLINICAL LOGIC & ALARM FATIGUE MANAGEMENT
         var activeAlertsToSave = new List<Alert>();
-
         // Suppress duplicate alert types within a 5-minute window
-        var recentAlertTypes = await _db.Alerts
+        var recentAlertTypes = await _db.Alerts.IgnoreQueryFilters()
             .Where(a => a.DeviceId == device.Id && a.CreatedAt >= DateTime.UtcNow.AddMinutes(-5))
             .Select(a => a.AlertType)
             .ToListAsync();
