@@ -1,5 +1,6 @@
 using MedicalDeviceMonitor.Data;
 using MedicalDeviceMonitor.Models;
+using MedicalDeviceMonitor.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -30,16 +31,8 @@ public class AlertsController : ControllerBase
             if (device == null)
                 return NotFound();
             
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var allowedLocations = await _db.WardAssignments
-                .Where(w => w.UserId == Guid.Parse(userId))
-                .Select(w => w.Location)
-                .Distinct()
-                .ToListAsync();
-            
-            if (allowedLocations.Any() && !allowedLocations.Contains(device.Location))
-                return Forbid();
-
+            // Thanks to Global Query Filters, if the device exists but isn't in an allowed location, 
+            // the above device lookup returns null (404). No manual check required.
             query = query.Where(a => a.Device!.DeviceCode == deviceCode);
         }
 
@@ -59,21 +52,7 @@ public class AlertsController : ControllerBase
             
         if (alert == null) return NotFound();
 
-        // Get user's assigned locations
         var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdString != null)
-        {
-            var userLocations = await _db.WardAssignments
-                .Where(w => w.UserId == Guid.Parse(userIdString))
-                .Select(w => w.Location)
-                .Distinct()
-                .ToListAsync();
-            
-            // Admin users might be allowed everywhere - skip check if admin
-            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-            if (userRole != "admin" && userLocations.Any() && !userLocations.Contains(alert.Device!.Location))
-                return Forbid();
-        }
 
         alert.IsResolved = true;
         alert.ResolvedAt = DateTime.UtcNow;

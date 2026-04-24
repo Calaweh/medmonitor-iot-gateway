@@ -51,16 +51,6 @@ public class ReadingsController : ControllerBase
             var device = await _db.Devices.FirstOrDefaultAsync(d => d.DeviceCode == deviceCode);
             if (device == null)
                 return NotFound();
-            
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var allowedLocations = await _db.WardAssignments
-                .Where(w => w.UserId == Guid.Parse(userId))
-                .Select(w => w.Location)
-                .Distinct()
-                .ToListAsync();
-            
-            if (allowedLocations.Any() && !allowedLocations.Contains(device.Location))
-                return Forbid();
 
             var history = await _readingService.GetHistoryAsync(deviceCode, limit, start, end);
             return Ok(history.Reverse()); // Return chronologically for charts

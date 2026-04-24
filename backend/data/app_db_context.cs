@@ -31,9 +31,21 @@ public class AppDbContext : DbContext
         // JSONB mapping
         modelBuilder.Entity<SensorReading>().Property(e => e.Payload).HasColumnType("jsonb");
 
-        // Ward isolation filter on Devices
+        // Ward isolation filters for complete data isolation
         modelBuilder.Entity<Device>().HasQueryFilter(d =>
             WardContext.AllowedLocations == null ||
             WardContext.AllowedLocations.Contains(d.Location));
+
+        modelBuilder.Entity<Alert>().HasQueryFilter(a =>
+            WardContext.AllowedLocations == null ||
+            WardContext.AllowedLocations.Contains(a.Device!.Location));
+
+        modelBuilder.Entity<SensorReading>().HasQueryFilter(r =>
+            WardContext.AllowedLocations == null ||
+            WardContext.AllowedLocations.Contains(r.Device!.Location));
+
+        modelBuilder.Entity<BedAssignment>().HasQueryFilter(b =>
+            WardContext.AllowedLocations == null ||
+            WardContext.AllowedLocations.Contains(b.Device!.Location));
     }
 }

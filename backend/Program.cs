@@ -216,25 +216,52 @@ app.Use(async (context, next) =>
 
 app.UseCors("AllowFrontend");
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.Use(async (context, next) =>
 {
     var userId = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-    if (userId != null)
+    var userRole = context.User?.FindFirst(ClaimTypes.Role)?.Value;
+
+    try
     {
-        using var scope = context.RequestServices.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var locations = await db.Set<WardAssignment>()
-            .Where(w => w.UserId == Guid.Parse(userId))
-            .Select(w => w.Location)
-            .Distinct()
-            .ToListAsync();
-        WardContext.AllowedLocations = locations;
+        if (userId != null)
+        {
+            if (userRole == "admin")
+            {
+                // Bypass filter entirely for admins
+                WardContext.AllowedLocations = null; 
+            }
+            else
+            {
+                using var scope = context.RequestServices.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var locations = await db.Set<WardAssignment>()
+                    .Where(w => w.UserId == Guid.Parse(userId))
+                    .Select(w => w.Location)
+                    .Distinct()
+                    .ToListAsync();
+                
+                // If they have no locations assigned, this empty list correctly blocks all queries
+                WardContext.AllowedLocations = locations; 
+            }
+        }
+        else
+        {
+            // Fallback for unauthenticated or system requests
+            WardContext.AllowedLocations = null;
+        }
+
+        await next();
     }
-    await next();
+    finally
+    {
+        // CRITICAL: Prevent leaking the previous user's locations to the next request on the same thread
+        WardContext.AllowedLocations = null; 
+    }
 });
 
-app.UseAuthentication();
-app.UseAuthorization();
 app.MapControllers();
 app.MapHub<VitalSignsHub>("/hubs/vitalsigns");
 

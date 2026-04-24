@@ -36,3 +36,18 @@ To secure clinician access, Time-Based One-Time Passwords (TOTP) will be introdu
 
 ## 4. Ward-Scoped Query Isolation
 Implemented via Entity Framework Core Global Query Filters (`WardContext`), mathematically isolating queries at the ORM boundary so that clinicians can only see devices assigned to their exact geographical ward.
+
+### Pitfalls & Verification
+1.  **Middleware Ordering:** The isolation middleware is positioned *after* `UseAuthentication()` and `UseAuthorization()`. This ensures `context.User` is populated before ward assignments are loaded.
+2.  **AsyncLocal Lifecycle:** `WardContext.AllowedLocations` is wrapped in a `try...finally` block within the middleware to ensure the context is cleared at the end of every HTTP request, preventing cross-request data leakage.
+3.  **Administrative Bypass:** Admin users have `AllowedLocations` set to `null`, effectively bypassing the global filter to allow total system oversight.
+4.  **Comprehensive Filtering:** Isolation filters are applied not only to the `Device` entity but also to `Alert`, `SensorReading`, and `BedAssignment` via navigation properties, ensuring that guessing a `DeviceCode` does not grant access to sensitive historical data.
+
+## 5. Implementation Status Summary
+
+| Requirement | Status | Verification Method |
+| :--- | :--- | :--- |
+| Data At-Rest Encryption | ✅ Enabled | Provider documentation (AWS/Supabase) |
+| Audit Log Integrity | ✅ Implemented | HMAC-SHA256 Chaining + `/api/audit/verify` |
+| Ward Isolation | ✅ Implemented | EF Core Global Query Filters + Middleware |
+| 2FA / TOTP | 📅 Planned | Implementation Blueprint defined |

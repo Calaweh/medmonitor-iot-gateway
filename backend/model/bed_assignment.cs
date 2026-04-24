@@ -14,4 +14,5 @@ public class BedAssignment
     [Column("diagnosis")] public string? Diagnosis { get; set; }
     
     public Patient? Patient { get; set; }
+    public Device? Device { get; set; }
 }
