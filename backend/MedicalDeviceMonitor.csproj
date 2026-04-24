@@ -19,6 +19,8 @@
 
     <!-- JWT Authentication -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.4" />
+ 
+    <!-- Structured logging → Grafana Loki -->
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.3.2" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.5.1" />
@@ -28,6 +30,12 @@
 
     <!-- BCrypt for password hashing -->
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+
+    <!-- PDF shift handover report generation (S4) -->
+    <PackageReference Include="QuestPDF" Version="2024.10.4" />
+ 
+    <!-- Health checks + EF Core readiness probe (S4) -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.4" />
   </ItemGroup>
 
 </Project>

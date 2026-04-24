@@ -21,6 +21,14 @@ public class ReadingService
     private readonly IHubContext<VitalSignsHub> _hub;
     private readonly ILogger<ReadingService> _logger;
 
+    // Global defaults — applied when no per-patient threshold override exists
+    private static readonly Dictionary<string, (double Min, double Max)> GlobalThresholds = new()
+    {
+        { "heart_rate", (40, 120) },
+        { "spo2",       (90, 100) },
+        { "temperature",(35, 39)  },
+    };
+
     public ReadingService(AppDbContext db, IHubContext<VitalSignsHub> hub, ILogger<ReadingService> logger)
     {
         _db = db;
@@ -37,13 +45,30 @@ public class ReadingService
             throw new Exception($"Device {dto.DeviceCode} not found.");
         }
 
-        // 1. Get the LAST reading before we save the new one (used for Rate of Change alerts)
+        // 1. Get last reading (for Rate-of-Change alerts)
         var lastReading = await _db.SensorReadings
             .Where(r => r.DeviceId == device.Id)
             .OrderByDescending(r => r.RecordedAt)
             .FirstOrDefaultAsync();
 
-        // 2. Save new reading to PostgreSQL
+        // 2. Resolve current patient (for per-patient thresholds)
+        var currentAssignment = await _db.BedAssignments
+            .Where(b => b.DeviceId == device.Id && b.DischargedAt == null)
+            .FirstOrDefaultAsync();
+
+        // 3. Load per-patient threshold overrides (P1 gap — now implemented)
+        Dictionary<string, (double? Min, double? Max)> patientThresholds = new();
+        if (currentAssignment != null)
+        {
+            var thresholdRows = await _db.Set<PatientThreshold>()
+                .Where(t => t.PatientId == currentAssignment.PatientId)
+                .ToListAsync();
+
+            foreach (var row in thresholdRows)
+                patientThresholds[row.VitalSign] = (row.MinValue, row.MaxValue);
+        }
+
+        // 4. Save new reading
         var reading = new SensorReading
         {
             DeviceId = device.Id,
@@ -52,53 +77,71 @@ public class ReadingService
         };
         _db.SensorReadings.Add(reading);
 
-        // 3. CLINICAL LOGIC & ALARM FATIGUE MANAGEMENT
+        // 5. CLINICAL LOGIC & ALARM FATIGUE MANAGEMENT
         var activeAlertsToSave = new List<Alert>();
-        
-        // Fetch alerts triggered in the last 5 minutes for this device
+
+        // Suppress duplicate alert types within a 5-minute window
         var recentAlertTypes = await _db.Alerts
             .Where(a => a.DeviceId == device.Id && a.CreatedAt >= DateTime.UtcNow.AddMinutes(-5))
             .Select(a => a.AlertType)
             .ToListAsync();
 
-        // Rule A: Absolute Heart Rate
+        // ── Rule A: Absolute Heart Rate ────────────────────────────────────
         if (dto.Payload.TryGetProperty("heart_rate", out var hr))
         {
             double currentHr = hr.GetDouble();
-            if ((currentHr > 120 || currentHr < 40) && !recentAlertTypes.Contains("ABNORMAL_HEART_RATE"))
+            var (hrMin, hrMax) = ResolveThreshold("heart_rate", patientThresholds);
+
+            if ((currentHr > hrMax || currentHr < hrMin) && !recentAlertTypes.Contains("ABNORMAL_HEART_RATE"))
             {
-                activeAlertsToSave.Add(CreateAlert(device.Id, reading, "ABNORMAL_HEART_RATE", "CRITICAL", $"Abnormal Heart Rate: {currentHr} bpm"));
+                activeAlertsToSave.Add(CreateAlert(device.Id, reading, "ABNORMAL_HEART_RATE", "CRITICAL",
+                    $"Abnormal Heart Rate: {currentHr} bpm (threshold: {hrMin}–{hrMax})"));
             }
 
-            // Rule B: Rate of Change (Spike/Drop > 20 BPM instantly)
+            // ── Rule B: Rate of Change ────────────────────────────────────
             if (lastReading != null && lastReading.Payload.RootElement.TryGetProperty("heart_rate", out var lastHr))
             {
-                if (Math.Abs(currentHr - lastHr.GetDouble()) >= 20 && !recentAlertTypes.Contains("SUDDEN_HR_CHANGE"))
+                double delta = Math.Abs(currentHr - lastHr.GetDouble());
+                if (delta >= 20 && !recentAlertTypes.Contains("SUDDEN_HR_CHANGE"))
                 {
-                    activeAlertsToSave.Add(CreateAlert(device.Id, reading, "SUDDEN_HR_CHANGE", "WARNING", $"Sudden HR change detected. Jumped by {Math.Abs(currentHr - lastHr.GetDouble())} bpm."));
+                    activeAlertsToSave.Add(CreateAlert(device.Id, reading, "SUDDEN_HR_CHANGE", "WARNING",
+                        $"Sudden HR change detected: Δ{delta:F0} bpm between consecutive readings."));
                 }
             }
         }
 
-        // Rule C: SpO2 Drop
+        // ── Rule C: SpO2 ──────────────────────────────────────────────────
         if (dto.Payload.TryGetProperty("spo2", out var spo2))
         {
             double currentSpo2 = spo2.GetDouble();
-            if (currentSpo2 < 90 && !recentAlertTypes.Contains("LOW_SPO2"))
+            var (spo2Min, _) = ResolveThreshold("spo2", patientThresholds);
+
+            if (currentSpo2 < spo2Min && !recentAlertTypes.Contains("LOW_SPO2"))
             {
-                activeAlertsToSave.Add(CreateAlert(device.Id, reading, "LOW_SPO2", "CRITICAL", $"Critical SpO2 Level: {currentSpo2}%"));
+                activeAlertsToSave.Add(CreateAlert(device.Id, reading, "LOW_SPO2", "CRITICAL",
+                    $"Critical SpO2 Level: {currentSpo2}% (threshold: ≥{spo2Min}%)"));
             }
         }
 
-        // Add any newly triggered alerts to the database
-        if (activeAlertsToSave.Any())
+        // ── Rule D: Temperature ───────────────────────────────────────────
+        if (dto.Payload.TryGetProperty("temperature", out var temp))
         {
-            _db.Alerts.AddRange(activeAlertsToSave);
+            double currentTemp = temp.GetDouble();
+            var (tempMin, tempMax) = ResolveThreshold("temperature", patientThresholds);
+
+            if ((currentTemp > tempMax || currentTemp < tempMin) && !recentAlertTypes.Contains("ABNORMAL_TEMPERATURE"))
+            {
+                activeAlertsToSave.Add(CreateAlert(device.Id, reading, "ABNORMAL_TEMPERATURE", "WARNING",
+                    $"Abnormal Temperature: {currentTemp}°C (threshold: {tempMin}–{tempMax}°C)"));
+            }
         }
+
+        if (activeAlertsToSave.Any())
+            _db.Alerts.AddRange(activeAlertsToSave);
 
         await _db.SaveChangesAsync();
 
-        // 4. Broadcast to React Frontend via SignalR
+        // 6. Broadcast via SignalR
         await _hub.Clients.All.SendAsync("ReceiveNewReading", new
         {
             reading.Id,
@@ -124,7 +167,22 @@ public class ReadingService
         }
     }
 
-    private Alert CreateAlert(Guid deviceId, SensorReading reading, string type, string severity, string message)
+    // ──────────────────────────────────────────────────────────────────────────
+    // Resolve threshold: per-patient override takes priority; falls back to global
+    // ──────────────────────────────────────────────────────────────────────────
+    private static (double Min, double Max) ResolveThreshold(
+        string key,
+        Dictionary<string, (double? Min, double? Max)> patientOverrides)
+    {
+        var global = GlobalThresholds.TryGetValue(key, out var g) ? g : (0.0, double.MaxValue);
+
+        if (!patientOverrides.TryGetValue(key, out var p))
+            return global;
+
+        return (p.Min ?? global.Min, p.Max ?? global.Max);
+    }
+
+    private static Alert CreateAlert(Guid deviceId, SensorReading reading, string type, string severity, string message)
     {
         return new Alert
         {
@@ -144,13 +202,14 @@ public class ReadingService
             .Where(r => r.Device!.DeviceCode == deviceCode);
 
         if (start.HasValue) query = query.Where(r => r.RecordedAt >= start.Value.ToUniversalTime());
-        if (end.HasValue) query = query.Where(r => r.RecordedAt <= end.Value.ToUniversalTime());
+        if (end.HasValue)   query = query.Where(r => r.RecordedAt <= end.Value.ToUniversalTime());
 
         var rawData = await query
             .OrderByDescending(r => r.RecordedAt)
             .Take(limit)
             .ToListAsync();
 
+        // Server-side decimation — keeps chart performant for long windows
         const int maxChartPoints = 100;
         if (rawData.Count > maxChartPoints)
         {
@@ -163,7 +222,7 @@ public class ReadingService
             r.DeviceId,
             DeviceCode = r.Device!.DeviceCode,
             r.RecordedAt,
-            r.Payload
+            Payload = r.Payload
         });
     }
 }

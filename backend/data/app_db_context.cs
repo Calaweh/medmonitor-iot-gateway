@@ -11,11 +11,10 @@ public class AppDbContext : DbContext
     public DbSet<SensorReading> SensorReadings { get; set; }
     public DbSet<Alert> Alerts { get; set; }
     public DbSet<User> Users { get; set; }
-    
-    // New Tables Registered!
     public DbSet<Patient> Patients { get; set; }
     public DbSet<BedAssignment> BedAssignments { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<PatientThreshold> PatientThresholds { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
