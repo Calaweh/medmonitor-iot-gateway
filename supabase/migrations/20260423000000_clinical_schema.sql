@@ -65,3 +65,22 @@ CREATE TABLE IF NOT EXISTS audit_log (
     ip_address INET,
     occurred_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ─── 6. Ward Assignments ───────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS ward_assignments (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     UUID REFERENCES users(id),
+    location    VARCHAR(100),  -- matches devices.location
+    assigned_at TIMESTAMPTZ DEFAULT NOW(),
+    assigned_by UUID REFERENCES users(id)
+);
+
+-- ─── 7. Role Permissions ───────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS role_permissions (
+    id          BIGSERIAL PRIMARY KEY,
+    role        VARCHAR(20),   -- nurse | doctor | admin
+    resource    VARCHAR(50),   -- alerts | readings | patients | users
+    can_read    BOOLEAN DEFAULT FALSE,
+    can_write   BOOLEAN DEFAULT FALSE,
+    can_delete  BOOLEAN DEFAULT FALSE
+);

@@ -126,6 +126,42 @@ P1 = show-stopper | P2 = clinical completeness | P3 = professional polish
 | Audit trail                   | ✔ Done     | —        | Immutable `audit_log` table implemented; logs clinical actions (e.g. resolve alert)  |
 | 2FA / Hospital AD SSO         | ✘ Missing  | P3       | Out of scope. Document as future integration point                                   |
 
+5.4.1 RBAC Matrix
+
+| Action | Nurse | Doctor | Admin |
+| :--- | :--- | :--- | :--- |
+| View vitals / alerts | ✅ | ✅ | ✅ |
+| Acknowledge / resolve alert | ✅ | ✅ | ❌ |
+| Set patient thresholds | ❌ | ✅ | ❌ |
+| Admit / discharge patient | ❌ | ✅ | ❌ |
+| Download shift report | ✅ | ✅ | ❌ |
+| Manage users | ❌ | ❌ | ✅ |
+| View audit log | ❌ | ✅ | ✅ |
+
+5.4.2 System Requirements Gap Analysis
+
+| Clinical Requirement | Compatibility | Implementation Effort | Priority |
+| :--- | :--- | :--- | :--- |
+| Feature Access Control | ❌ Missing | Medium (3-4 days) | P2 |
+| Ward/Site Management | ⚠️ Partial | Low (2-3 days) | P1 |
+| Role Management | ✅ Complete | None | - |
+| Clinician Management | ⚠️ Partial | Low (1-2 days) | P1 |
+| Clinical Audit Log | ✅ Complete | None (query endpoint needed) | P1 |
+| Clinician's Ward | ❌ Missing | Low (1 day) | P1 |
+| Clinician's Role | ✅ Complete | None | - |
+| Role Authorization | ✅ Complete | None | - |
+
+5.4.3 Functional Mapping (General vs. Clinical)
+
+| Core System Requirement | Medical Equivalent for MedMonitor |
+| :--- | :--- |
+| Access Management | Feature Authorization (RBAC guards) |
+| Site Management | Ward Management (ICU, HDU, General) |
+| Role Management | Clinical Role Management (nurse/doctor/admin) |
+| Identity Management | Clinician Management (with ward assignments) |
+| Operation Log | Clinical Audit Trail (immutable/rigorous) |
+| Code Generator | Not applicable |
+
 5.5 Reporting & Data Export
 
 | Feature                       | Status    | Priority | Action / Notes                                                                          |
