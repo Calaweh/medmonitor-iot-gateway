@@ -174,12 +174,12 @@ public class ReadingService
         string key,
         Dictionary<string, (double? Min, double? Max)> patientOverrides)
     {
-        var global = GlobalThresholds.TryGetValue(key, out var g) ? g : (0.0, double.MaxValue);
+        var def = GlobalThresholds.TryGetValue(key, out var g) ? g : (Min: 0.0, Max: double.MaxValue);
 
         if (!patientOverrides.TryGetValue(key, out var p))
-            return global;
+            return def;
 
-        return (p.Min ?? global.Min, p.Max ?? global.Max);
+        return (p.Min ?? def.Min, p.Max ?? def.Max);
     }
 
     private static Alert CreateAlert(Guid deviceId, SensorReading reading, string type, string severity, string message)

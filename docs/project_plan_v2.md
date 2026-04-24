@@ -3,7 +3,7 @@ Medical Device Data Acquisition & Monitoring System
 Project Plan — Version 2.0
 Objective: Develop a production-grade medical device monitoring system following high-reliability architecture and clinical data standards.
 
-Status: Infrastructure and Clinical Core (v2) complete. Current development targets reporting (PDF), RBAC refinement, and regulatory documentation (SRS/SDS).
+Status: Infrastructure, Clinical Core, Dashboard, and Reporting (v2) complete. Current development targets regulatory documentation (SRS/SDS) and final system polish.
 
 1. Tech Stack
 
@@ -101,7 +101,7 @@ P1 = show-stopper | P2 = clinical completeness | P3 = professional polish
 | HR global threshold                  | ✔ Done     | —        | `ReadingService` persists alert + broadcasts via SignalR                             |
 | SpO2 alerting (persisted)            | ✔ Done     | —        | Implemented in `ReadingService` — creates DB alert when SpO2 < 90                    |
 | Trend / rate-of-change alerting      | ✔ Done     | —        | Implemented in `ReadingService`. Alerts if HR delta >= 20 bpm between readings       |
-| Per-patient threshold overrides      | ✘ Missing  | P1       | New table: `patient_thresholds`. `ReadingService` queries per-patient bounds first   |
+| Per-patient threshold overrides      | ✔ Done     | P1       | Implemented in `ReadingService`. Queries `patient_thresholds` table with global fallback. |
 | Alert escalation (nurse → doctor)    | ✘ Missing  | P2       | If alert unacknowledged for N minutes, escalate severity & notify physician          |
 | Alarm fatigue management             | ✔ Done     | —        | Implemented in `ReadingService` via 5-minute suppression window per alert type       |
 | Alert resolution with actor + reason | ✔ Done     | —        | Acknowledge endpoint creates immutable `audit_log` entry with `user_id` from JWT     |
@@ -131,7 +131,7 @@ P1 = show-stopper | P2 = clinical completeness | P3 = professional polish
 | Feature                       | Status    | Priority | Action / Notes                                                                          |
 | :---------------------------- | :-------- | :------- | :-------------------------------------------------------------------------------------- |
 | Grafana operations dashboard  | ✔ Done    | —        | Provisioned: Loki log panel + VictoriaMetrics ingestion rate                            |
-| Clinical shift handover (PDF) | ✘ Missing | P2       | QuestPDF: 8-hour window summary per bed. Shows vitals stats + alerts fired + resolution |
+| Clinical shift handover (PDF) | ✔ Done    | P2       | QuestPDF: 8-hour window summary per bed. Shows vitals stats + alerts fired + resolution |
 | Data export CSV / FHIR R4     | ✘ Missing | P3       | \`GET /api/readings/{device}/export?format=csv                                          |
 | Vitals trend chart in PDF     | ✘ Missing | P2       | Render Recharts to image server-side or generate SVG in QuestPDF                        |
 
@@ -151,8 +151,8 @@ P1 = show-stopper | P2 = clinical completeness | P3 = professional polish
 | :------------------------- | :--------- | :------- | :------------------------------------------------------------------------------- |
 | EF Core retry-on-failure   | ✔ Done     | —        | 3 retries, 5 s delay — handles Supabase transient failures                       |
 | Supabase keep-alive        | ✔ Done     | —        | Pings `/api/devices` every 3 days via GitHub Actions                             |
-| Health check endpoint      | \~ Partial | P2       | Add `app.MapHealthChecks` with DB readiness probe. Update keepalive to `/health` |
-| Swagger with bearer auth   | \~ Partial | P2       | `AddSecurityDefinition('Bearer')` + padlock button in UI                         |
+| Health check endpoint      | ✔ Done     | P2       | Added `/health` (liveness) and `/health/db` (EF Core readiness probe).               |
+| Swagger with bearer auth   | ✔ Done     | P2       | `AddSecurityDefinition('Bearer')` enabled. Authorize with `Bearer <token>` in UI.    |
 | Offline / local buffer     | ✘ Missing  | P3       | Python sim: queue readings locally, retry with backoff                           |
 | Backup / disaster recovery | ✘ Missing  | P3       | Supabase: enable PITR. Document RPO/RTO in SRS                                   |
 
@@ -256,7 +256,7 @@ medical-device-monitoring/
 │   └── grafana/               # Dashboards & Datasource provisioning
 ├── docker-compose.yml         # Full stack orchestration
 ├── .env.example               # Template for secrets
-└── README.md                  # Portfolio centerpiece
+└── README.md                  
 ```
 
 9. Implementation Status Tracker
@@ -273,13 +273,14 @@ medical-device-monitoring/
 - [x] **Identity:** Patient management & Bed assignment logic
 - [x] **Alerting:** Multi-vital thresholds (HR, SpO2) & suppression windows
 - [x] **Audit:** Immutable clinical action audit log
-- [ ] **Reporting:** QuestPDF shift handover report generation
+- [x] **Reporting:** QuestPDF shift handover report generation
+- [x] **Health Checks:** Liveness & Readiness (DB) probes
 
 ### 🏁 Phase 3: Final Polish
 - [ ] Real-time chart decimation logic (performance optimization)
 - [ ] PDPA compliance (consent flags)
 - [ ] Production deployment (Render/Railway)
-- [ ] Portfolio Documentation (Architecture diagrams + GIF)
+- [ ] Documentation (Architecture diagrams + GIF)
 
 
 10. Deployment Notes
@@ -372,7 +373,7 @@ observation duty).
   - Npgsql.EntityFrameworkCore.PostgreSQL: Standard C# PostgreSQL provider.
     Supports JSONB type mapping via HasColumnType("jsonb").
   - Swashbuckle: Auto-generates OpenAPI/Swagger UI. v2 adds bearer security
-    definition so interviewers can test auth-protected endpoints.
+    definition so tester can test auth-protected endpoints.
   - QuestPDF (new in v2): Pure .NET PDF generation library. Used for shift
     handover reports. No external process or runtime dependency.
   - Microsoft.AspNetCore.Authentication.JwtBearer: JWT middleware. Validates

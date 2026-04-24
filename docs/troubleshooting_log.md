@@ -38,3 +38,13 @@ This document records critical errors encountered during the development of the 
 - **Symptom:** `{app="medmon_backend", detected_level="error"}` failed.
 - **Why:** Labels are queried inside `{ }`. Non-indexed metadata must be filtered after the braces using `|`.
 - **Solution:** Changed the query to `{app="medmon_backend"} | json | level="Error"`.
+
+## 8. QuestPDF Chain Violation (CS1929)
+- **Symptom:** `error CS1929: 'TextBlockDescriptor' does not contain a definition for 'Padding'`.
+- **Why:** In QuestPDF, `Padding()` and `Background()` are methods on `IContainer`. Calling `.Text("...")` returns a `TextBlockDescriptor`, which ends the container chain and starts a text chain.
+- **Solution:** Moved `Background()` and `Padding()` calls *before* the `.Text()` call so they apply to the container holding the text.
+
+## 9. .NET 8 Tuple Method Ambiguity (CS0019)
+- **Symptom:** `error CS0019: Operator '??' cannot be applied to operands of type 'double?' and 'method group'`.
+- **Why:** .NET 8 introduced static `double.Min` and `double.Max` methods. If a variable is named `global` or if a tuple element is named `Min`/`Max` without explicit typing, the compiler may confuse the tuple element with the `System.Double` method group.
+- **Solution:** Renamed the local variable from `global` to `def` and used named tuple literals `(Min: 0.0, Max: double.MaxValue)` to explicitly define the field names and avoid resolution ambiguity.

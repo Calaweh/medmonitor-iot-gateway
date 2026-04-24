@@ -124,9 +124,16 @@ function App() {
                     }`}
                   >
                     <Bed size={16} />
-                    <div>
-                      <div className="font-medium">{bed.deviceCode}</div>
-                      <div className="text-[10px] opacity-60">{bed.description}</div>
+                    <div className="flex-grow">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{bed.deviceCode}</span>
+                        {bed.currentAssignment && (
+                          <span className="text-[9px] bg-emerald-500/10 px-1.5 py-0.5 rounded text-emerald-500 uppercase font-bold">Admitted</span>
+                        )}
+                      </div>
+                      <div className="text-[10px] opacity-60">
+                        {bed.currentAssignment?.patient?.fullName || bed.description}
+                      </div>
                     </div>
                   </button>
                 ))}
@@ -139,7 +146,11 @@ function App() {
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 overflow-y-auto">
         {selectedDevice ? (
-          <PatientDetail deviceCode={selectedDevice} token={token} />
+          <PatientDetail 
+            deviceCode={selectedDevice} 
+            token={token} 
+            patientInfo={devices.find(d => d.deviceCode === selectedDevice)?.currentAssignment}
+          />
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-slate-500">
             <Activity size={48} className="mb-4 opacity-20" />
@@ -153,9 +164,32 @@ function App() {
 }
 
 // Extracted Component for the detailed patient view
-function PatientDetail({ deviceCode, token }) { 
+function PatientDetail({ deviceCode, token, patientInfo }) { 
   const { readings, latestReading, alerts } = useVitals(BACKEND_URL, deviceCode, token); 
   
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const downloadShiftReport = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await axios.get(`${BACKEND_URL}/api/shiftreport/${deviceCode}`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `ShiftReport_${deviceCode}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error("Failed to download report", err);
+      alert("Failed to generate report. Ensure you have clinical data for this window.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const payload = latestReading?.payload || {};
 
   const alertState = useMemo(() => {
@@ -169,12 +203,36 @@ function PatientDetail({ deviceCode, token }) {
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
-      <header className="flex justify-between items-center border-b border-slate-800 pb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-3">
-            Patient Telemetry
-            <span className="text-sm font-normal px-2 py-1 bg-slate-800 rounded-md text-slate-400">Bed: {deviceCode}</span>
-          </h2>
+      <header className="flex justify-between items-start border-b border-slate-800 pb-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-slate-100">
+              {patientInfo?.patient?.fullName || "Unassigned Bed"}
+            </h2>
+            <span className="text-xs px-2 py-1 bg-slate-800 rounded-md text-slate-400 font-mono">
+              {deviceCode}
+            </span>
+          </div>
+          {patientInfo ? (
+            <div className="flex gap-4 text-xs text-slate-500">
+              <span>MRN: <span className="text-slate-300">{patientInfo.patient.mrn}</span></span>
+              <span>•</span>
+              <span>Diagnosis: <span className="text-slate-300">{patientInfo.diagnosis}</span></span>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500 italic">No active patient assignment.</p>
+          )}
+          
+          <div className="pt-2">
+            <button 
+              onClick={downloadShiftReport}
+              disabled={isGenerating}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-emerald-400 text-xs font-bold rounded flex items-center gap-2 transition-colors border border-emerald-500/20"
+            >
+              <Activity size={14} />
+              {isGenerating ? "GENERATING REPORT..." : "SHIFT REPORT (PDF)"}
+            </button>
+          </div>
         </div>
         <div className="flex gap-4">
           <StatusCard label="Heart Rate" value={payload.heart_rate} unit="bpm" icon={<Heart className={alertState.color === 'red' && (payload.heart_rate > 120 || payload.heart_rate < 40) ? "text-red-500 animate-pulse" : "text-emerald-400"} />} />

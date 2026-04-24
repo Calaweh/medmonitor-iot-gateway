@@ -119,10 +119,8 @@ public class ShiftReportController : ControllerBase
             });
             row.ConstantItem(120).AlignRight().Column(col =>
             {
-                col.Item().Text("SYNTHETIC DATA")
-                    .FontSize(8).Bold().FontColor(Colors.Red.Medium)
-                    .BackgroundColor(Colors.Red.Lighten4)
-                    .Padding(3);
+                col.Item().Background(Colors.Red.Lighten4).Padding(3).Text("SYNTHETIC DATA")
+                    .FontSize(8).Bold().FontColor(Colors.Red.Medium);
             });
         });
 
