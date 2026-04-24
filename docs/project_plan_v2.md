@@ -3,7 +3,7 @@ Medical Device Data Acquisition & Monitoring System
 Project Plan — Version 2.0
 Objective: Develop a production-grade medical device monitoring system following high-reliability architecture and clinical data standards.
 
-Status: Infrastructure foundation complete. Current development targets patient identity, clinical logic, RBAC, and IEC 62304 regulatory framing.
+Status: Infrastructure and Clinical Core (v2) complete. Current development targets reporting (PDF), RBAC refinement, and regulatory documentation (SRS/SDS).
 
 1. Tech Stack
 
@@ -99,19 +99,19 @@ P1 = show-stopper | P2 = clinical completeness | P3 = professional polish
 | Feature                              | Status     | Priority | Action / Notes                                                                       |
 | :----------------------------------- | :--------- | :------- | :----------------------------------------------------------------------------------- |
 | HR global threshold                  | ✔ Done     | —        | `ReadingService` persists alert + broadcasts via SignalR                             |
-| SpO2 alerting (persisted)            | \~ Partial | P1       | Frontend-only check. Mirror into `ReadingService` — create DB alert when SpO2 \< 90  |
-| Trend / rate-of-change alerting      | ✘ Missing  | P2       | Rolling 5-reading window. Alert if delta \> 20 bpm / 60 s                            |
+| SpO2 alerting (persisted)            | ✔ Done     | —        | Implemented in `ReadingService` — creates DB alert when SpO2 < 90                    |
+| Trend / rate-of-change alerting      | ✔ Done     | —        | Implemented in `ReadingService`. Alerts if HR delta >= 20 bpm between readings       |
 | Per-patient threshold overrides      | ✘ Missing  | P1       | New table: `patient_thresholds`. `ReadingService` queries per-patient bounds first   |
 | Alert escalation (nurse → doctor)    | ✘ Missing  | P2       | If alert unacknowledged for N minutes, escalate severity & notify physician          |
-| Alarm fatigue management             | ✘ Missing  | P2       | Don't re-fire same alert type for same device within configurable suppression window |
-| Alert resolution with actor + reason | \~ Partial | P1       | Endpoint exists but missing `resolved_by_user_id` and `resolution_note` fields       |
+| Alarm fatigue management             | ✔ Done     | —        | Implemented in `ReadingService` via 5-minute suppression window per alert type       |
+| Alert resolution with actor + reason | ✔ Done     | —        | Acknowledge endpoint creates immutable `audit_log` entry with `user_id` from JWT     |
 
 5.3 Patient & Ward Management
 
 | Feature                         | Status    | Priority | Action / Notes                                                                       |
 | :------------------------------ | :-------- | :------- | :----------------------------------------------------------------------------------- |
-| Patient profiles (MRN, DOB)     | ✘ Missing | P1       | New table: `patients`. Seed from `patients_meta.csv` on simulator start              |
-| Bed assignment flow             | ✘ Missing | P1       | New table: `bed_assignments` (patient\_id, device\_id, admitted\_at, discharged\_at) |
+| Patient profiles (MRN, DOB)     | ✔ Done    | —        | Table `patients` implemented and seeded with fake clinical data                      |
+| Bed assignment flow             | ✔ Done    | —        | Table `bed_assignments` implemented; `DevicesController` returns current patient     |
 | Ward / site grouping            | ✔ Done    | —        | Devices grouped by `devices.location` in the React sidebar                           |
 | Per-patient medication schedule | ✘ Missing | P3       | Table: `medication_schedules`. Out of scope for v2 — document as future work         |
 | Clinical notes (SOAP format)    | ✘ Missing | P3       | Table: `clinical_notes`. Rich text per patient per shift                             |
@@ -120,10 +120,10 @@ P1 = show-stopper | P2 = clinical completeness | P3 = professional polish
 
 | Feature                       | Status     | Priority | Action / Notes                                                                       |
 | :---------------------------- | :--------- | :------- | :----------------------------------------------------------------------------------- |
-| JWT infrastructure            | \~ Partial | P1       | Packages added. No `[Authorize]` on any controller. Add users table + login endpoint |
-| RBAC (nurse / doctor / admin) | ✘ Missing  | P1       | Encode role claim in JWT. Add `[Authorize(Roles=...)]` to controllers                |
-| Login / logout UI             | ✘ Missing  | P1       | React login page, token stored in memory (not localStorage)                          |
-| Audit trail                   | ✘ Missing  | P1       | Append-only `audit_log` table. Written by middleware on every state-change endpoint  |
+| JWT infrastructure            | ✔ Done     | —        | JWT authentication middleware active; `[Authorize]` applied to clinical controllers   |
+| RBAC (nurse / doctor / admin) | ~ Partial  | P1       | Role claim encoded in JWT; logic ready for granular `[Authorize(Roles=...)]` checks  |
+| Login / logout UI             | ✔ Done     | —        | React login page with session persistence and automatic token refresh/logout logic   |
+| Audit trail                   | ✔ Done     | —        | Immutable `audit_log` table implemented; logs clinical actions (e.g. resolve alert)  |
 | 2FA / Hospital AD SSO         | ✘ Missing  | P3       | Out of scope. Document as future integration point                                   |
 
 5.5 Reporting & Data Export
@@ -269,10 +269,10 @@ medical-device-monitoring/
 - [x] Supabase project linking & initial migrations
 
 ### 🚀 Phase 2: v2 Clinical Core (In Progress)
-- [ ] **Auth:** JWT infrastructure & Role-Based Access Control
-- [ ] **Identity:** Patient management & Bed assignment logic
-- [ ] **Alerting:** Multi-vital thresholds (HR, SpO2) & suppression windows
-- [ ] **Audit:** Immutable audit log middleware
+- [x] **Auth:** JWT infrastructure & Session Persistence
+- [x] **Identity:** Patient management & Bed assignment logic
+- [x] **Alerting:** Multi-vital thresholds (HR, SpO2) & suppression windows
+- [x] **Audit:** Immutable clinical action audit log
 - [ ] **Reporting:** QuestPDF shift handover report generation
 
 ### 🏁 Phase 3: Final Polish

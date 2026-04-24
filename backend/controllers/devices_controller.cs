@@ -1,5 +1,5 @@
 using MedicalDeviceMonitor.Data;
-using Microsoft.AspNetCore.Authorization; 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,16 +11,24 @@ namespace MedicalDeviceMonitor.Controllers;
 public class DevicesController : ControllerBase
 {
     private readonly AppDbContext _db;
-
-    public DevicesController(AppDbContext db)
-    {
-        _db = db;
-    }
+    public DevicesController(AppDbContext db) => _db = db;
 
     [HttpGet]
     public async Task<IActionResult> GetDevices()
     {
-        var devices = await _db.Devices.ToListAsync();
+        // Fetch devices AND their currently admitted patient
+        var devices = await _db.Devices
+            .Select(d => new {
+                d.Id,
+                d.DeviceCode,
+                d.Location,
+                d.Description,
+                CurrentAssignment = _db.BedAssignments
+                    .Include(b => b.Patient)
+                    .Where(b => b.DeviceId == d.Id && b.DischargedAt == null)
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
         return Ok(devices);
     }
 
