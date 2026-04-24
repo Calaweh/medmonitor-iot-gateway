@@ -1,6 +1,9 @@
+using MedicalDeviceMonitor.Data;
 using MedicalDeviceMonitor.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace MedicalDeviceMonitor.Controllers;
 
@@ -10,11 +13,13 @@ namespace MedicalDeviceMonitor.Controllers;
 public class ReadingsController : ControllerBase
 {
     private readonly ReadingService _readingService;
+    private readonly AppDbContext _db;
     private readonly ILogger<ReadingsController> _logger;
 
-    public ReadingsController(ReadingService readingService, ILogger<ReadingsController> logger)
+    public ReadingsController(ReadingService readingService, AppDbContext db, ILogger<ReadingsController> logger)
     {
         _readingService = readingService;
+        _db = db;
         _logger = logger;
     }
 
@@ -43,6 +48,20 @@ public class ReadingsController : ControllerBase
     {
         try
         {
+            var device = await _db.Devices.FirstOrDefaultAsync(d => d.DeviceCode == deviceCode);
+            if (device == null)
+                return NotFound();
+            
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var allowedLocations = await _db.WardAssignments
+                .Where(w => w.UserId == Guid.Parse(userId))
+                .Select(w => w.Location)
+                .Distinct()
+                .ToListAsync();
+            
+            if (allowedLocations.Any() && !allowedLocations.Contains(device.Location))
+                return Forbid();
+
             var history = await _readingService.GetHistoryAsync(deviceCode, limit, start, end);
             return Ok(history.Reverse()); // Return chronologically for charts
         }

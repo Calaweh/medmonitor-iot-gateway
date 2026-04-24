@@ -3,7 +3,7 @@ Medical Device Data Acquisition & Monitoring System
 Project Plan — Version 2.0
 Objective: Develop a production-grade medical device monitoring system following high-reliability architecture and clinical data standards.
 
-Status: Infrastructure, Clinical Core, Dashboard, and Reporting (v2) complete. Current development targets regulatory documentation (SRS/SDS) and final system polish.
+Status: Infrastructure, Clinical Core, Dashboard, and Reporting (v2) complete. **P0 production‑readiness gaps identified (data retention, ward isolation, security hardening).** Current development targets regulatory documentation (SRS/SDS) and final system polish **with revised priorities (security + operations first).**
 
 1. Tech Stack
 
@@ -105,6 +105,15 @@ P1 = show-stopper | P2 = clinical completeness | P3 = professional polish
 | Alert escalation (nurse → doctor)    | ✘ Missing  | P2       | If alert unacknowledged for N minutes, escalate severity & notify physician          |
 | Alarm fatigue management             | ✔ Done     | —        | Implemented in `ReadingService` via 5-minute suppression window per alert type       |
 | Alert resolution with actor + reason | ✔ Done     | —        | Acknowledge endpoint creates immutable `audit_log` entry with `user_id` from JWT     |
+| **Resolve alert (ward check)**       | ✘ Missing  | **P0**   | Only allow resolve if clinician belongs to same ward as device.                      |
+
+5.2.1 Critical Production Gaps (P0)
+
+| Feature                                | Status      | Priority | Action / Notes                                                              |
+| :------------------------------------- | :---------- | :------- | :-------------------------------------------------------------------------- |
+| Data retention purge for sensor_readings | ✘ Missing  | **P0**   | Add scheduled DELETE job (Supabase pg_cron or Hangfire). 30‑day retention.  |
+| Ward‑scoped data isolation            | ✘ Missing   | **P0**   | Enforce user.department_id == device.department_id in every query (EF filter). |
+| Alert resolution ward check           | ✘ Missing   | **P0**   | Only allow resolve if clinician belongs to same ward as device.             |
 
 5.3 Patient & Ward Management
 
@@ -135,32 +144,22 @@ P1 = show-stopper | P2 = clinical completeness | P3 = professional polish
 | Set patient thresholds | ❌ | ✅ | ❌ |
 | Admit / discharge patient | ❌ | ✅ | ❌ |
 | Download shift report | ✅ | ✅ | ❌ |
+| Resolve alert (own ward only)  | ✅    | ✅     | ❌    |
 | Manage users | ❌ | ❌ | ✅ |
 | View audit log | ❌ | ✅ | ✅ |
 
 5.4.2 System Requirements Gap Analysis
 
-| Clinical Requirement | Compatibility | Implementation Effort | Priority |
-| :--- | :--- | :--- | :--- |
-| Feature Access Control | ❌ Missing | Medium (3-4 days) | P2 |
-| Ward/Site Management | ⚠️ Partial | Low (2-3 days) | P1 |
-| Role Management | ✅ Complete | None | - |
-| Clinician Management | ⚠️ Partial | Low (1-2 days) | P1 |
-| Clinical Audit Log | ✅ Complete | None (query endpoint needed) | P1 |
-| Clinician's Ward | ❌ Missing | Low (1 day) | P1 |
-| Clinician's Role | ✅ Complete | None | - |
-| Role Authorization | ✅ Complete | None | - |
-
-5.4.3 Functional Mapping (General vs. Clinical)
-
-| Core System Requirement | Medical Equivalent for MedMonitor |
-| :--- | :--- |
-| Access Management | Feature Authorization (RBAC guards) |
-| Site Management | Ward Management (ICU, HDU, General) |
-| Role Management | Clinical Role Management (nurse/doctor/admin) |
-| Identity Management | Clinician Management (with ward assignments) |
-| Operation Log | Clinical Audit Trail (immutable/rigorous) |
-| Code Generator | Not applicable |
+| Clinical Requirement          | Compatibility | Implementation Effort | Priority |
+| :---------------------------- | :------------ | :-------------------- | :------- |
+| **Data retention purge**      | ✘ Missing     | 1 day                 | **P0**   |
+| **Ward‑scoped isolation**     | ✘ Missing     | 2 days                | **P0**   |
+| **Alert ward accountability** | ✘ Missing     | 1 day                 | **P0**   |
+| Audit log integrity (hash)    | ✘ Missing     | 2 days                | P1       |
+| Data at‑rest encryption       | ~ Partial     | 1 day (doc)           | P1       |
+| 2FA / SSO                     | ✘ Missing     | 5‑7 days              | P2       |
+| Department management UI      | ~ Partial     | 2‑3 days              | P3       |
+| Dynamic menus                 | ✘ Missing     | 3‑4 days              | P3       |
 
 5.5 Reporting & Data Export
 
@@ -168,7 +167,7 @@ P1 = show-stopper | P2 = clinical completeness | P3 = professional polish
 | :---------------------------- | :-------- | :------- | :-------------------------------------------------------------------------------------- |
 | Grafana operations dashboard  | ✔ Done    | —        | Provisioned: Loki log panel + VictoriaMetrics ingestion rate                            |
 | Clinical shift handover (PDF) | ✔ Done    | P2       | QuestPDF: 8-hour window summary per bed. Shows vitals stats + alerts fired + resolution |
-| Data export CSV / FHIR R4     | ✘ Missing | P3       | \`GET /api/readings/{device}/export?format=csv                                          |
+| Data export CSV / FHIR R4 | ✘ Missing | P4 | Not planned unless EMR demands; effort 3‑6 weeks. Document as future work. |
 | Vitals trend chart in PDF     | ✘ Missing | P2       | Render Recharts to image server-side or generate SVG in QuestPDF                        |
 
 5.6 Regulatory & Compliance Framing
@@ -179,7 +178,7 @@ P1 = show-stopper | P2 = clinical completeness | P3 = professional polish
 | Data at-rest encryption       | ✘ Missing  | P2       | Supabase enables PG encryption at rest. Document and verify in SRS                      |
 | PDPA (Malaysia) consent model | ✘ Missing  | P2       | Add patient consent flag to patients table. Block export without consent=true           |
 | IEC 62304 SRS / SDS docs      | ✘ Missing  | P2       | Add `docs/srs.md`: Class B classification, functional requirements with IDs, risk table |
-| Data retention policy         | \~ Partial | P2       | Loki: 15 days. Supabase: no retention. Add scheduled purge job or policy                |
+| Data retention policy (Supabase) | ✘ Missing | P0 | Add scheduled purge job (30 days). Document in SRS. |
 
 5.7 Operations & Resilience
 
@@ -259,13 +258,15 @@ File: supabase/migrations/20260423000000_v2_clinical_schema.sql
 
 7. Execution Plan — v2 Sprints
 
-| Sprint              | Deliverable                                                                                                                                | Key Files                                             |
-| :------------------ | :----------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------- |
-| **S1 — Foundation** | Run migration. Seed patients from CSV. Add users table + bcrypt login endpoint. Wire `[Authorize]` on all controllers.                     | `migration SQL`, `AuthController.cs`, `LoginPage.jsx` |
-| **S2 — Clinical**   | Patient thresholds table + `ReadingService` lookup. SpO2 backend alert. Trend rate-of-change alert. Alert suppression window.              | `ReadingService.cs`, `patient_thresholds migration`   |
-| **S3 — Dashboard**  | React: patient name + diagnosis in sidebar. Multi-vital chart (HR, SpO2, Resp, BP, Temp). Alert acknowledge button (logged to audit\_log). | `App.jsx`, `PatientDetail.jsx`, `useVitals.js`        |
-| **S4 — Reporting**  | QuestPDF shift handover report endpoint. Health check endpoint. Swagger bearer auth. IEC 62304 SRS markdown doc.                           | `ShiftReportController.cs`, `srs.md`                  |
-| **S5 — Polish**     | PDPA consent flag. Sensor calibration table. README screenshots + GIF. Deploy to Render + verify keepalive.                                | `README.md`, `docker-compose.yml`                     |
+| Sprint | Deliverable | Key Files |
+|--------|-------------|-----------|
+| **S0 — Production Hardening** | ✅ Add department isolation (user + device). Implement EF Core global query filter. Add data retention purge job (Hangfire). Enforce alert resolution ward check. | `AppDbContext.cs`, `AlertsController.cs`, `RetentionService.cs`, migration SQL |
+| **S1 — Security Hardening** | ✅ Hash‑chained audit log integrity (HMAC). ✅ Document Supabase TDE at rest. 2FA / TOTP clinician login plan. | `AuditService.cs`, `SecurityDocs.md`, `AuthController.cs` |
+| **S2 — Foundation** | Run migration. Seed patients from CSV. Add users table + bcrypt login endpoint. Wire `[Authorize]` on all controllers.                     | `migration SQL`, `AuthController.cs`, `LoginPage.jsx` |
+| **S3 — Clinical**   | Patient thresholds table + `ReadingService` lookup. SpO2 backend alert. Trend rate-of-change alert. Alert suppression window.              | `ReadingService.cs`, `patient_thresholds migration`   |
+| **S4 — Dashboard**  | React: patient name + diagnosis in sidebar. Multi-vital chart (HR, SpO2, Resp, BP, Temp). Alert acknowledge button (logged to audit\_log). | `App.jsx`, `PatientDetail.jsx`, `useVitals.js`        |
+| **S5 — Reporting**  | QuestPDF shift handover report endpoint. Health check endpoint. Swagger bearer auth. IEC 62304 SRS markdown doc.                           | `ShiftReportController.cs`, `srs.md`                  |
+| **S6 — Polish**     | PDPA consent flag. Sensor calibration table. README screenshots + GIF. Deploy to Render + verify keepalive.                                | `README.md`, `docker-compose.yml`                     |
 
 8. Project Folder Structure
 
@@ -312,9 +313,25 @@ medical-device-monitoring/
 - [x] **Reporting:** QuestPDF shift handover report generation
 - [x] **Health Checks:** Liveness & Readiness (DB) probes
 
-### 🏁 Phase 3: Final Polish
-- [ ] Real-time chart decimation logic (performance optimization)
-- [ ] PDPA compliance (consent flags)
+### ✅ Phase 3: Production Readiness (P0 – Complete)
+- [x] **Data retention purge job** – delete sensor_readings older than 30 days (Hangfire)
+- [x] **Ward‑scoped data isolation** – enforce user.department_id == device.department_id
+- [x] **Alert accountability** – resolve only if clinician belongs to same ward as device
+
+### ✅ Phase 4: Security & Compliance (P1 – High)
+- [x] Hash‑chained audit log integrity (HMAC verification)
+- [x] Document Supabase TDE at rest
+- [ ] 2FA / TOTP for clinician login
+
+### 🟡 Phase 5: Clinical Completeness (P2)
+- [ ] Medication schedules table + alert for missed doses
+- [ ] SOAP clinical notes per patient
+- [ ] ADT transfer history
+
+### 🟢 Phase 6: Enterprise Polish (P3)
+- [ ] Dynamic menu management (DB driven)
+- [ ] Department CRUD UI
+- [ ] Real-time chart decimation (performance)
 - [ ] Production deployment (Render/Railway)
 - [ ] Documentation (Architecture diagrams + GIF)
 
@@ -343,6 +360,10 @@ URL to your live deployment URL.
 | EF Core JSONB complexity   | Low      | Dapper raw SQL available as fallback for complex JSONB projections.                                    |
 | Connection pool exhaustion | Low      | `REPLAY_SPEED_SEC=3` + EF Core retry logic. `No Reset On Close=true` in conn string.                    |
 | Patient data privacy       | High     | All patient data is synthetic (Kaggle simulated dataset). Add **SYNTHETIC DATA** banner to README.     |
+| Sensor readings table grows beyond 500 MB (Supabase limit) | **High** | Scheduled purge job (30 days retention). Monitor size with daily alert.                                |
+| Nurse resolves alert for patient in different ward         | High     | Enforce ward check in `AlertsController.ResolveAlert`. Audit log discrepancies.                        |
+| Security audit trail tampering                             | Medium   | Implement hash chaining (store previous hash in each audit_log row) + external HMAC verification.     |
+| FHIR integration assumed but not delivered                 | Medium   | De‑prioritise to P4; document as “future work” unless contractually required. Estimate 3‑6 weeks.    |
 
 12. Documentation & Technical Strategy
 
@@ -399,6 +420,9 @@ observation duty).
 | **SRS-004** | All state-changing endpoints shall require a valid JWT with appropriate role claim.                     | Test: call without JWT, expect HTTP 401                        |
 | **SRS-005** | The system shall retain sensor readings for a minimum of 15 days before purging.                        | Config review: verify retention policy applied                 |
 | **SRS-006** | Patient data export shall require explicit `consent=true` flag on the patient record.                   | Test: export with `consent=false`, expect HTTP 403             |
+| **SRS-007** | The system shall purge sensor readings older than 30 days automatically once per day.                  | Verify `sensor_readings` table does not contain rows older than 30 days. |
+| **SRS-008** | A clinician resolving an alert must belong to the same department (ward) as the device that raised it. | Test: attempt resolve with different department, expect HTTP 403. |
+| **SRS-009** | The audit log shall include a hash of the previous entry to detect tampering.                          | Test: modify a log entry → verification endpoint fails.        |
 
 15. Dependency & Environment Rationale
 
@@ -414,6 +438,8 @@ observation duty).
     handover reports. No external process or runtime dependency.
   - Microsoft.AspNetCore.Authentication.JwtBearer: JWT middleware. Validates
     tokens, extracts role claims for RBAC.
+  - **Hangfire** (or `pg_cron` connector) – scheduled data retention purge job.
+  - **System.Security.Cryptography** (built‑in) – HMAC‑SHA256 for audit log integrity.
 
 15.2 Simulation (Python)
 

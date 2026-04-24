@@ -13,14 +13,35 @@ namespace MedicalDeviceMonitor.Controllers;
 public class AlertsController : ControllerBase
 {
     private readonly AppDbContext _db;
-    public AlertsController(AppDbContext db) => _db = db;
+    private readonly AuditService _auditService;
+    public AlertsController(AppDbContext db, AuditService auditService)
+    {
+        _db = db;
+        _auditService = auditService;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetActiveAlerts([FromQuery] string? deviceCode)
     {
         var query = _db.Alerts.Include(a => a.Device).AsQueryable();
         if (!string.IsNullOrEmpty(deviceCode))
+        {
+            var device = await _db.Devices.FirstOrDefaultAsync(d => d.DeviceCode == deviceCode);
+            if (device == null)
+                return NotFound();
+            
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var allowedLocations = await _db.WardAssignments
+                .Where(w => w.UserId == Guid.Parse(userId))
+                .Select(w => w.Location)
+                .Distinct()
+                .ToListAsync();
+            
+            if (allowedLocations.Any() && !allowedLocations.Contains(device.Location))
+                return Forbid();
+
             query = query.Where(a => a.Device!.DeviceCode == deviceCode);
+        }
 
         var alerts = await query.Where(a => !a.IsResolved).OrderByDescending(a => a.CreatedAt).Take(50).ToListAsync();
         
@@ -32,26 +53,46 @@ public class AlertsController : ControllerBase
     [HttpPost("{id}/resolve")]
     public async Task<IActionResult> ResolveAlert(long id)
     {
-        var alert = await _db.Alerts.FindAsync(id);
+        var alert = await _db.Alerts
+            .Include(a => a.Device)
+            .FirstOrDefaultAsync(a => a.Id == id);
+            
         if (alert == null) return NotFound();
+
+        // Get user's assigned locations
+        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdString != null)
+        {
+            var userLocations = await _db.WardAssignments
+                .Where(w => w.UserId == Guid.Parse(userIdString))
+                .Select(w => w.Location)
+                .Distinct()
+                .ToListAsync();
+            
+            // Admin users might be allowed everywhere - skip check if admin
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+            if (userRole != "admin" && userLocations.Any() && !userLocations.Contains(alert.Device!.Location))
+                return Forbid();
+        }
 
         alert.IsResolved = true;
         alert.ResolvedAt = DateTime.UtcNow;
 
-        // --- ADD IMMUTABLE AUDIT LOG ---
-        // Read the ID of the user who clicked the button from the JWT Token
-        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        
-        var audit = new AuditLog
-        {
-            UserId = userIdString != null ? Guid.Parse(userIdString) : null,
-            Action = "RESOLVE_ALERT",
-            EntityType = "Alert",
-            EntityId = id.ToString()
-        };
-        _db.AuditLogs.Add(audit);
+        var userId = userIdString != null ? Guid.Parse(userIdString) : (Guid?)null;
 
-        await _db.SaveChangesAsync();
-        return Ok(new { message = "Alert resolved and logged in audit trail." });
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            await _db.SaveChangesAsync(); // Saves the alert state
+            await _auditService.LogActionAsync(userId, "RESOLVE_ALERT", "Alert", id.ToString()); // Creates secure log
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+
+        return Ok(new { message = "Alert resolved and securely logged in audit trail." });
     }
 }

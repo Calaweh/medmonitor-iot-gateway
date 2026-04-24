@@ -36,6 +36,12 @@
  
     <!-- Health checks + EF Core readiness probe (S4) -->
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.4" />
+
+    <!-- Hangfire - background jobs -->
+    <PackageReference Include="Hangfire.Core" Version="1.8.*" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.20.*" />
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.*" />
+    
   </ItemGroup>
 
 </Project>

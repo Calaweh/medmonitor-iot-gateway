@@ -1,11 +1,18 @@
 using MedicalDeviceMonitor.Models;
+using MedicalDeviceMonitor.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace MedicalDeviceMonitor.Data;
 
 public class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    private readonly IHttpContextAccessor? _httpContextAccessor;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options,
+                        IHttpContextAccessor? httpContextAccessor = null) : base(options)
+    {
+        _httpContextAccessor = httpContextAccessor;
+    }
 
     public DbSet<Device> Devices { get; set; }
     public DbSet<SensorReading> SensorReadings { get; set; }
@@ -15,10 +22,18 @@ public class AppDbContext : DbContext
     public DbSet<BedAssignment> BedAssignments { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<PatientThreshold> PatientThresholds { get; set; }
+    public DbSet<WardAssignment> WardAssignments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // JSONB mapping
         modelBuilder.Entity<SensorReading>().Property(e => e.Payload).HasColumnType("jsonb");
+
+        // Ward isolation filter on Devices
+        modelBuilder.Entity<Device>().HasQueryFilter(d =>
+            WardContext.AllowedLocations == null ||
+            WardContext.AllowedLocations.Contains(d.Location));
     }
 }

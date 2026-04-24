@@ -48,3 +48,18 @@ This document records critical errors encountered during the development of the 
 - **Symptom:** `error CS0019: Operator '??' cannot be applied to operands of type 'double?' and 'method group'`.
 - **Why:** .NET 8 introduced static `double.Min` and `double.Max` methods. If a variable is named `global` or if a tuple element is named `Min`/`Max` without explicit typing, the compiler may confuse the tuple element with the `System.Double` method group.
 - **Solution:** Renamed the local variable from `global` to `def` and used named tuple literals `(Min: 0.0, Max: double.MaxValue)` to explicitly define the field names and avoid resolution ambiguity.
+
+## 10. Sprint 0 Hardening: Build & Runtime Failures
+- **Symptoms:**
+    - `error CS0246: The type or namespace name 'AppDbContext' could not be found`
+    - `error CS1061: 'IServiceCollection' does not contain a definition for 'AddHangfireServer'`
+    - `Unhandled exception: System.InvalidOperationException: Current JobStorage instance has not been initialized yet.`
+- **Why:**
+    1. **Namespace Isolation:** New services (e.g., `RetentionService`) were added to the `Services` namespace but lacked `using` directives for `Data` and `Models`.
+    2. **Missing Dependencies:** `Hangfire.Core` was installed, but `Hangfire.AspNetCore` (providing DI extensions) and `Hangfire.PostgreSql` (providing the storage provider) were missing from `csproj` or the `using` block.
+    3. **Static API Usage:** Using the static `RecurringJob.AddOrUpdate` in .NET Core before the DI container is fully built leads to initialization race conditions.
+- **Solutions:**
+    - **Usings:** Synchronized namespaces and added `using MedicalDeviceMonitor.Data;`, `using MedicalDeviceMonitor.Models;`, and `using Hangfire;` across all new controllers and services.
+    - **Csproj:** Added `Hangfire.AspNetCore` and `Hangfire.PostgreSql` to `MedicalDeviceMonitor.csproj`.
+    - **DI-Aware Jobs:** Replaced static `RecurringJob` calls with `IRecurringJobManager` resolved from an `IServiceScope` after `app.Build()`.
+    - **Cleanup:** Fixed a duplicate `userIdString` declaration in `AlertsController` and removed a broken "TenantId" query filter workaround in `AppDbContext`.

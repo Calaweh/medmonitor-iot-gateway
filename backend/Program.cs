@@ -13,6 +13,10 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Text.Json;
+using MedicalDeviceMonitor.Models;
+using System.Security.Claims;
+using Hangfire;
+using Hangfire.PostgreSql;
 
 // Load .env.local and force overwrite existing env vars
 Env.Load("../.env", new LoadOptions(
@@ -145,6 +149,15 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 builder.Services.AddScoped(typeof(ReadingService));
+builder.Services.AddScoped<AuditService>();
+
+// Hangfire for scheduled jobs
+builder.Services.AddHangfire(config =>
+    config.UsePostgreSqlStorage(connectionString));
+builder.Services.AddHangfireServer();
+
+// Register the retention job as a service
+builder.Services.AddScoped<RetentionService>();
 
 var app = builder.Build();
 
@@ -202,9 +215,36 @@ app.Use(async (context, next) =>
 });
 
 app.UseCors("AllowFrontend");
+
+app.Use(async (context, next) =>
+{
+    var userId = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (userId != null)
+    {
+        using var scope = context.RequestServices.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var locations = await db.Set<WardAssignment>()
+            .Where(w => w.UserId == Guid.Parse(userId))
+            .Select(w => w.Location)
+            .Distinct()
+            .ToListAsync();
+        WardContext.AllowedLocations = locations;
+    }
+    await next();
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<VitalSignsHub>("/hubs/vitalsigns");
+
+using (var scope = app.Services.CreateScope())
+{
+    var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+    recurringJobManager.AddOrUpdate<RetentionService>(
+        "purge-old-readings",
+        svc => svc.PurgeOldReadingsAsync(),
+        "0 2 * * *");
+}
 
 app.Run();
