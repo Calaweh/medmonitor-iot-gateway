@@ -54,9 +54,12 @@ public class AuditService
 
     private string CalculateHash(AuditLog log)
     {
-        // Normalize datetime to a fixed precision string to avoid serialization differences
-        var timeStr = log.OccurredAt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-        var rawData = $"{log.UserId?.ToString() ?? "NULL"}|{log.Action}|{log.EntityType}|{log.EntityId}|{log.Detail ?? "NULL"}|{timeStr}|{log.PreviousHash ?? "NULL"}";
+        var timeStr = log.OccurredAt.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        
+        // Ensure Detail is treated consistently (null vs empty string)
+        string detailStr = string.IsNullOrEmpty(log.Detail) ? "NULL" : log.Detail;
+
+        var rawData = $"{log.UserId?.ToString() ?? "NULL"}|{log.Action}|{log.EntityType}|{log.EntityId}|{detailStr}|{timeStr}|{log.PreviousHash ?? "NULL"}";
         
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_hmacKey));
         var hashBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(rawData));
@@ -65,9 +68,16 @@ public class AuditService
 
     public async Task<bool> VerifyChainAsync()
     {
-        var logs = await _db.AuditLogs.OrderBy(a => a.Id).ToListAsync();
-        string? expectedPrev = null;
+        // .AsNoTracking() forces EF Core to read fresh data from Postgres 
+        // bypassing the internal memory cache.
+        var logs = await _db.AuditLogs
+            .AsNoTracking()
+            .OrderBy(a => a.Id)
+            .ToListAsync();
 
+        if (!logs.Any()) return true; // Empty is technically "intact"
+
+        string? expectedPrev = null;
         foreach (var log in logs)
         {
             if (log.PreviousHash != expectedPrev) 

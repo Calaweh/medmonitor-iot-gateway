@@ -22,6 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<BedAssignment> BedAssignments { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<PatientThreshold> PatientThresholds { get; set; }
+    public DbSet<CalibrationRecord> CalibrationRecords { get; set; }
     
     // Replacing old WardAssignments with the new ABAC AccessPolicies
     public DbSet<AccessPolicy> AccessPolicies { get; set; }
@@ -32,6 +33,7 @@ public class AppDbContext : DbContext
         
         // JSONB mapping
         modelBuilder.Entity<SensorReading>().Property(e => e.Payload).HasColumnType("jsonb");
+        modelBuilder.Entity<AuditLog>().Property(e => e.Detail).HasColumnType("jsonb");
 
         var now = DateTime.UtcNow;
 

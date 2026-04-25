@@ -266,7 +266,7 @@ File: supabase/migrations/20260423000000_v2_clinical_schema.sql
 | **S3 — Clinical**   | Patient thresholds table + `ReadingService` lookup. SpO2 backend alert. Trend rate-of-change alert. Alert suppression window.              | `ReadingService.cs`, `patient_thresholds migration`   |
 | **S4 — Dashboard**  | React: patient name + diagnosis in sidebar. Multi-vital chart (HR, SpO2, Resp, BP, Temp). Alert acknowledge button (logged to audit\_log). | `App.jsx`, `PatientDetail.jsx`, `useVitals.js`        |
 | **S5 — Reporting**  | QuestPDF shift handover report endpoint. Health check endpoint. Swagger bearer auth. IEC 62304 SRS markdown doc.                           | `ShiftReportController.cs`, `srs.md`                  |
-| **S6 — Polish**     | PDPA consent flag. Sensor calibration table. README screenshots + GIF. Deploy to Render + verify keepalive.                                | `README.md`, `docker-compose.yml`                     |
+| **S6 — Polish**     | ✅ PDPA consent flag. ✅ Sensor calibration table. README screenshots + GIF. Deploy to Render + verify keepalive.                                | `README.md`, `docker-compose.yml`                     |
 
 8. Project Folder Structure
 
@@ -331,7 +331,7 @@ medical-device-monitoring/
 ### 🟢 Phase 6: Enterprise Polish (P3)
 - [ ] Dynamic menu management (DB driven)
 - [ ] Department CRUD UI
-- [ ] Real-time chart decimation (performance)
+- [x] Real-time chart decimation (performance)
 - [ ] Production deployment (Render/Railway)
 - [ ] Documentation (Architecture diagrams + GIF)
 
@@ -358,11 +358,11 @@ URL to your live deployment URL.
 | Supabase auto-pause        | Medium   | GitHub Actions keepalive every 3 days. Manual restore before demonstrations.                           |
 | Project Scope Creep        | Medium   | Multi-phase implementation; focus on core clinical requirements first.                                 |
 | EF Core JSONB complexity   | Low      | Dapper raw SQL available as fallback for complex JSONB projections.                                    |
-| Connection pool exhaustion | Low      | `REPLAY_SPEED_SEC=3` + EF Core retry logic. `No Reset On Close=true` in conn string.                    |
+| Connection pool exhaustion | Low      | `REPLAY_SPEED_SEC=3` + EF Core retry logic. `No Reset On Close=true` in conn string.                   |
 | Patient data privacy       | High     | All patient data is synthetic (Kaggle simulated dataset). Add **SYNTHETIC DATA** banner to README.     |
-| Sensor readings table grows beyond 500 MB (Supabase limit) | **High** | Scheduled purge job (30 days retention). Monitor size with daily alert.                                |
-| Nurse resolves alert for patient in different ward         | High     | Enforce ward check in `AlertsController.ResolveAlert`. Audit log discrepancies.                        |
-| Security audit trail tampering                             | Medium   | Implement hash chaining (store previous hash in each audit_log row) + external HMAC verification.     |
+| Sensor readings table grows beyond 500 MB (Supabase limit) | High     | Scheduled purge job (30 days retention). Monitor size with daily alert.                              |
+| Nurse resolves alert for patient in different ward         | High     | Enforce ward check in `AlertsController.ResolveAlert`. Audit log discrepancies.                      |
+| Security audit trail tampering                             | Medium   | Implement hash chaining (store previous hash in each audit_log row) + external HMAC verification.    |
 | FHIR integration assumed but not delivered                 | Medium   | De‑prioritise to P4; document as “future work” unless contractually required. Estimate 3‑6 weeks.    |
 
 12. Documentation & Technical Strategy

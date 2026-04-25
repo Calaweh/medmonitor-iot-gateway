@@ -46,32 +46,41 @@ public class AlertsController : ControllerBase
     [HttpPost("{id}/resolve")]
     public async Task<IActionResult> ResolveAlert(long id)
     {
-        var alert = await _db.Alerts
-            .Include(a => a.Device)
-            .FirstOrDefaultAsync(a => a.Id == id);
-            
-        if (alert == null) return NotFound();
+        var strategy = _db.Database.CreateExecutionStrategy();
 
-        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-        alert.IsResolved = true;
-        alert.ResolvedAt = DateTime.UtcNow;
-
-        var userId = userIdString != null ? Guid.Parse(userIdString) : (Guid?)null;
-
-        using var transaction = await _db.Database.BeginTransactionAsync();
-        try
+        // Added <IActionResult> here to tell the compiler what the lambda returns
+        return await strategy.ExecuteAsync<IActionResult>(async () => 
         {
-            await _db.SaveChangesAsync(); // Saves the alert state
-            await _auditService.LogActionAsync(userId, "RESOLVE_ALERT", "Alert", id.ToString()); // Creates secure log
-            await transaction.CommitAsync();
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
+            using var transaction = await _db.Database.BeginTransactionAsync();
+            try
+            {
+                var alert = await _db.Alerts
+                    .Include(a => a.Device)
+                    .FirstOrDefaultAsync(a => a.Id == id);
 
-        return Ok(new { message = "Alert resolved and securely logged in audit trail." });
+                if (alert == null) 
+                {
+                    // No need to commit if not found
+                    return NotFound(); 
+                }
+
+                var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                alert.IsResolved = true;
+                alert.ResolvedAt = DateTime.UtcNow;
+
+                var userId = userIdString != null ? Guid.Parse(userIdString) : (Guid?)null;
+
+                await _db.SaveChangesAsync(); 
+                await _auditService.LogActionAsync(userId, "RESOLVE_ALERT", "Alert", id.ToString()); 
+                
+                await transaction.CommitAsync();
+                return Ok(new { message = "Alert resolved and securely logged in audit trail." });
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                throw; 
+            }
+        });
     }
 }
