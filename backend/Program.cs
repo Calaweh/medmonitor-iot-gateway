@@ -148,8 +148,6 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-builder.Services.AddScoped<UserAccessContext>();
-
 builder.Services.AddScoped(typeof(ReadingService));
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<MedicationService>();
@@ -225,23 +223,56 @@ app.UseAuthorization();
 app.Use(async (context, next) =>
 {
     var userIdString = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-    var userRole = context.User?.FindFirst(ClaimTypes.Role)?.Value;
+    var userRole     = context.User?.FindFirst(ClaimTypes.Role)?.Value;
 
-    // Resolve the scoped instance for THIS specific HTTP request
-    var accessContext = context.RequestServices.GetRequiredService<UserAccessContext>();
-
-    if (!string.IsNullOrEmpty(userIdString) && Guid.TryParse(userIdString, out var userId))
+    // Detect system-level requests (like the Python Simulator hitting the Ingest API)
+    bool isSystemIngest = false;
+    
+    // We allow the ingest endpoint to bypass RLS here so the controller can load 
+    // the device from the database and cryptographically verify the X-Device-Api-Key.
+    if (string.IsNullOrEmpty(userIdString) && context.Request.Path.StartsWithSegments("/api/readings/ingest", StringComparison.OrdinalIgnoreCase))
     {
-        accessContext.IsAuthenticated = true;
-        accessContext.IsAdmin = (userRole == "admin");
-        accessContext.UserId = userId;
-    }
-    else
-    {
-        accessContext.IsAuthenticated = false;
+        isSystemIngest = true;
     }
 
-    await next();
+    var db = context.RequestServices.GetRequiredService<AppDbContext>();
+
+    // 1. EXPLICITLY OPEN THE CONNECTION
+    // This forces EF Core to keep the same physical connection for the entire HTTP request,
+    // ensuring our Postgres Session Variables survive across multiple queries.
+    await db.Database.OpenConnectionAsync();
+
+    try
+    {
+        if (!string.IsNullOrEmpty(userIdString))
+        {
+            // Set session variables for RLS evaluation
+            await db.Database.ExecuteSqlRawAsync(
+                "SELECT set_config('app.current_user_id', {0}, false), " +
+                "       set_config('app.user_role', {1}, false)",
+                userIdString, userRole ?? "clinician"
+            );
+        }
+        else if (isSystemIngest)
+        {
+            // System processes bypass RLS
+            await db.Database.ExecuteSqlRawAsync("SELECT set_config('app.user_role', 'system', false)");
+        }
+
+        await next();
+    }
+    finally
+    {
+        // PREVENT ADO.NET CONNECTION POOL POISONING
+        // Clears the session variables before the connection is returned to the pool.
+        await db.Database.ExecuteSqlRawAsync(
+            "SELECT set_config('app.current_user_id', '', false), " +
+            "       set_config('app.user_role', '', false)"
+        );
+        
+        // 2. EXPLICITLY CLOSE THE CONNECTION
+        await db.Database.CloseConnectionAsync();
+    }
 });
 
 app.MapControllers();
@@ -261,5 +292,10 @@ using (var scope = app.Services.CreateScope())
         svc => svc.CheckOverdueMedicationsAsync(),
         "*/15 * * * *");
 }
+
+var testHash = BCrypt.Net.BCrypt.HashPassword("DeviceSecret123!");
+Console.WriteLine("================================================");
+Console.WriteLine($"VALID .NET HASH: {testHash}");
+Console.WriteLine("================================================");
 
 app.Run();

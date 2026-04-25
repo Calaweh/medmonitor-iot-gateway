@@ -90,7 +90,7 @@ def simulate_device(device_code: str, row_offset: int):
         }
         headers = {
             "X-Correlation-ID": correlation_id,
-            "X-Device-Key": os.getenv("DEVICE_API_KEY", "DEV_DEFAULT_KEY_123!")
+            "X-Device-Api-Key": os.getenv("DEVICE_API_KEY", "DeviceSecret123!")
         }
         
         alert = check_alert(payload)
@@ -105,10 +105,11 @@ def simulate_device(device_code: str, row_offset: int):
                 # Log success to Loki so we see activity in Grafana
                 push_to_loki(device_code, "INFO", f"Ingested HR={payload.get('heart_rate')}", "normal", correlation_id)
             else:
-                print(f"[{device_code}] ❌ Backend Error: {resp.status_code}")
+                print(f"[{device_code}] ❌ Backend Error: {resp.status_code} — {resp.text}")
                 push_to_loki(device_code, "ERROR", f"HTTP {resp.status_code}", "abnormal", correlation_id)
         except requests.exceptions.RequestException as e:
-            print(f"[{device_code}] ❌ Connection Error")
+            print(f"[{device_code}] ❌ Connection Error: {e}")
+            push_to_loki(device_code, "ERROR", f"Connection Error: {e}", "abnormal", correlation_id)
             
         time.sleep(REPLAY_SPEED)
 

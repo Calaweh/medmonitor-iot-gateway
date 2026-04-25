@@ -36,32 +36,38 @@ public class ReadingService
         _logger = logger;
     }
 
-    public async Task ProcessNewReadingAsync(IngestReadingDto dto)
+    public async Task ProcessNewReadingAsync(IngestReadingDto dto, string apiKey)
     {
-        // IgnoreQueryFilters() ensures System background processes can read data regardless of ABAC policies
-        var device = await _db.Devices.IgnoreQueryFilters().FirstOrDefaultAsync(d => d.DeviceCode == dto.DeviceCode);
+        var device = await _db.Devices.FirstOrDefaultAsync(d => d.DeviceCode == dto.DeviceCode);
+        
         if (device == null)
         {
             _logger.LogWarning("Abnormal Event: Received data for unknown device {DeviceCode}", dto.DeviceCode);
             throw new Exception($"Device {dto.DeviceCode} not found.");
         }
+
+        // --- DEVICE AUTHENTICATION ---
+        if (string.IsNullOrEmpty(device.ApiKeyHash) || !BCrypt.Net.BCrypt.Verify(apiKey, device.ApiKeyHash))
+        {
+            throw new UnauthorizedAccessException($"Invalid API Key for device {dto.DeviceCode}");
+        }
         
         // 1. Get last reading (for Rate-of-Change alerts)
-        var lastReading = await _db.SensorReadings.IgnoreQueryFilters()
+        var lastReading = await _db.SensorReadings
             .Where(r => r.DeviceId == device.Id)
             .OrderByDescending(r => r.RecordedAt)
             .FirstOrDefaultAsync();
-            
+
         // 2. Resolve current patient (for per-patient thresholds)
-        var currentAssignment = await _db.BedAssignments.IgnoreQueryFilters()
+        var currentAssignment = await _db.BedAssignments
             .Where(b => b.DeviceId == device.Id && b.DischargedAt == null)
             .FirstOrDefaultAsync();
-            
+
         // 3. Load per-patient threshold overrides
         Dictionary<string, (double? Min, double? Max)> patientThresholds = new();
         if (currentAssignment != null)
         {
-            var thresholdRows = await _db.Set<PatientThreshold>().IgnoreQueryFilters()
+            var thresholdRows = await _db.Set<PatientThreshold>()
                 .Where(t => t.PatientId == currentAssignment.PatientId)
                 .ToListAsync();
             foreach (var row in thresholdRows)
@@ -79,8 +85,9 @@ public class ReadingService
         
         // 5. CLINICAL LOGIC & ALARM FATIGUE MANAGEMENT
         var activeAlertsToSave = new List<Alert>();
+
         // Suppress duplicate alert types within a 5-minute window
-        var recentAlertTypes = await _db.Alerts.IgnoreQueryFilters()
+        var recentAlertTypes = await _db.Alerts
             .Where(a => a.DeviceId == device.Id && a.CreatedAt >= DateTime.UtcNow.AddMinutes(-5))
             .Select(a => a.AlertType)
             .ToListAsync();

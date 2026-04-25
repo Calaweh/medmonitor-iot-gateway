@@ -17,12 +17,16 @@ public class MedicationService
 
     public async Task CheckOverdueMedicationsAsync()
     {
-        var now = DateTime.UtcNow;
-        // Find meds scheduled in the past that are still 'scheduled' and not administered
-        var overdueMeds = await _db.Set<MedicationSchedule>()
-            .IgnoreQueryFilters() // System-level check
-            .Where(m => m.Status == "scheduled" && m.ScheduledAt < now.AddMinutes(-30))
-            .ToListAsync();
+        await _db.Database.OpenConnectionAsync();
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync("SELECT set_config('app.user_role', 'system', false)");
+
+            var now = DateTime.UtcNow;
+            // Find meds scheduled in the past that are still 'scheduled' and not administered
+            var overdueMeds = await _db.Set<MedicationSchedule>()
+                .Where(m => m.Status == "scheduled" && m.ScheduledAt < now.AddMinutes(-30))
+                .ToListAsync();
 
         foreach (var med in overdueMeds)
         {
@@ -46,5 +50,11 @@ public class MedicationService
         }
 
         await _db.SaveChangesAsync();
+        }
+        finally
+        {
+            await _db.Database.ExecuteSqlRawAsync("SELECT set_config('app.user_role', '', false)");
+            await _db.Database.CloseConnectionAsync();
+        }
     }
 }

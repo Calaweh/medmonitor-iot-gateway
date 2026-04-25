@@ -30,4 +30,7 @@ public class Device
     
     [Column("is_active")]
     public bool IsActive { get; set; }
+    
+    [Column("api_key_hash")] 
+    public string? ApiKeyHash { get; set; }
 }

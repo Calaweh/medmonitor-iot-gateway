@@ -41,7 +41,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginDto request)
     {
         var user = await _db.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
-
+        
         if (user == null)
             return Unauthorized(new { error = "User not found in the database." });
             

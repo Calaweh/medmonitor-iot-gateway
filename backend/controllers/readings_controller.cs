@@ -27,20 +27,24 @@ public class ReadingsController : ControllerBase
     [HttpPost("ingest")]
     public async Task<IActionResult> IngestData([FromBody] IngestReadingDto dto)
     {
-        // Require a Device API Key to prevent forged medical data
-        var expectedKey = Environment.GetEnvironmentVariable("DEVICE_API_KEY") ?? "DEV_DEFAULT_KEY_123!";
-        var providedKey = Request.Headers["X-Device-Key"].FirstOrDefault();
-        
-        if (providedKey != expectedKey)
+        // 1. Extract the per-device API key from the headers
+        var apiKey = Request.Headers["X-Device-Api-Key"].FirstOrDefault();
+        if (string.IsNullOrEmpty(apiKey))
         {
-            _logger.LogWarning("Unauthorized device payload rejected for {DeviceCode}", dto.DeviceCode);
-            return Unauthorized(new { error = "Invalid or missing Device API Key." });
+            _logger.LogWarning("Ingest attempt rejected: Missing API Key for device {DeviceCode}", dto.DeviceCode);
+            return Unauthorized(new { error = "Missing Device API Key." });
         }
 
         try
         {
-            await _readingService.ProcessNewReadingAsync(dto);
+            // 2. Pass the key down to the service for cryptographic verification
+            await _readingService.ProcessNewReadingAsync(dto, apiKey);
             return Ok(new { message = "Data ingested and broadcasted successfully" });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Ingest attempt rejected: {Message}", ex.Message);
+            return Unauthorized(new { error = ex.Message });
         }
         catch (Exception ex)
         {
