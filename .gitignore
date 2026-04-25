@@ -56,7 +56,7 @@ database/*.sqlite
 database/*.sqlite3
 database/*.csv
 database/.env
-database/helper_scripts/*
+database/scripts/*
 
 # ─── Node Modules (General) ──────────────────────────────────
 node_modules/

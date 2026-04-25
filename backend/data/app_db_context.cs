@@ -23,8 +23,9 @@ public class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<PatientThreshold> PatientThresholds { get; set; }
     public DbSet<CalibrationRecord> CalibrationRecords { get; set; }
-    
-    // Replacing old WardAssignments with the new ABAC AccessPolicies
+    public DbSet<MedicationSchedule> MedicationSchedules { get; set; }
+    public DbSet<ClinicalNote> ClinicalNotes { get; set; }
+    public DbSet<PatientTransfer> PatientTransfers { get; set; }
     public DbSet<AccessPolicy> AccessPolicies { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

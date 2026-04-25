@@ -150,6 +150,7 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddScoped(typeof(ReadingService));
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddScoped<MedicationService>();
 
 // Hangfire for scheduled jobs
 builder.Services.AddHangfire(config =>
@@ -262,6 +263,12 @@ using (var scope = app.Services.CreateScope())
         "purge-old-readings",
         svc => svc.PurgeOldReadingsAsync(),
         "0 2 * * *");
+
+    // Check for missed meds every 15 minutes
+    recurringJobManager.AddOrUpdate<MedicationService>(
+        "check-missed-meds",
+        svc => svc.CheckOverdueMedicationsAsync(),
+        "*/15 * * * *");
 }
 
 app.Run();

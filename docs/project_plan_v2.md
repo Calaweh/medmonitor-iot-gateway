@@ -323,10 +323,10 @@ medical-device-monitoring/
 - [x] Document Supabase TDE at rest
 - [x] 2FA / TOTP for clinician login
 
-### 🟡 Phase 5: Clinical Completeness (P2)
-- [ ] Medication schedules table + alert for missed doses
-- [ ] SOAP clinical notes per patient
-- [ ] ADT transfer history
+### ✅ Phase 5: Clinical Completeness (P2)
+- [x] Medication schedules table + alert for missed doses
+- [x] SOAP clinical notes per patient
+- [x] ADT transfer history
 
 ### 🟢 Phase 6: Enterprise Polish (P3)
 - [ ] Dynamic menu management (DB driven)
