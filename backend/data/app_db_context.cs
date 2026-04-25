@@ -6,12 +6,13 @@ namespace MedicalDeviceMonitor.Data;
 
 public class AppDbContext : DbContext
 {
-    private readonly IHttpContextAccessor? _httpContextAccessor;
+    // Injected per-request
+    public UserAccessContext AccessContext { get; }
 
     public AppDbContext(DbContextOptions<AppDbContext> options,
-                        IHttpContextAccessor? httpContextAccessor = null) : base(options)
+                        UserAccessContext accessContext) : base(options)
     {
-        _httpContextAccessor = httpContextAccessor;
+        AccessContext = accessContext;
     }
 
     public DbSet<Device> Devices { get; set; }
@@ -33,17 +34,17 @@ public class AppDbContext : DbContext
         base.OnModelCreating(modelBuilder);
         
         // JSONB mapping
+        // JSONB mapping
         modelBuilder.Entity<SensorReading>().Property(e => e.Payload).HasColumnType("jsonb");
         modelBuilder.Entity<AuditLog>().Property(e => e.Detail).HasColumnType("jsonb");
 
-        var now = DateTime.UtcNow;
-
+        // ─── ABAC / Multi-Tenant Native Subquery Filters ───────────────────────────────
         modelBuilder.Entity<Device>().HasQueryFilter(d =>
-            SecurityContext.Current != null && (
-                SecurityContext.Current.IsAdmin || 
+            this.AccessContext.IsAuthenticated && (
+                this.AccessContext.IsAdmin || 
                 AccessPolicies.Any(p => 
-                    p.UserId == SecurityContext.Current.UserId && p.IsActive && 
-                    (p.ExpiresAt == null || p.ExpiresAt > now) &&
+                    p.UserId == this.AccessContext.UserId && p.IsActive && 
+                    (p.ExpiresAt == null || p.ExpiresAt > DateTime.UtcNow) &&
                     (
                         (p.AllowedSite == null || p.AllowedSite == d.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == d.Department) &&
@@ -54,12 +55,12 @@ public class AppDbContext : DbContext
             )
         );
 
-        modelBuilder.Entity<Alert>().HasQueryFilter(a =>
-            SecurityContext.Current != null && (
-                SecurityContext.Current.IsAdmin || 
+        modelBuilder.Entity<Alert>().HasQueryFilter(d =>
+            this.AccessContext.IsAuthenticated && (
+                this.AccessContext.IsAdmin || 
                 AccessPolicies.Any(p => 
-                    p.UserId == SecurityContext.Current.UserId && p.IsActive && 
-                    (p.ExpiresAt == null || p.ExpiresAt > now) &&
+                    p.UserId == this.AccessContext.UserId && p.IsActive && 
+                    (p.ExpiresAt == null || p.ExpiresAt > DateTime.UtcNow) &&
                     (
                         (p.AllowedSite == null || p.AllowedSite == a.Device!.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == a.Device!.Department) &&
@@ -69,13 +70,13 @@ public class AppDbContext : DbContext
                 )
             )
         );
-        
-        modelBuilder.Entity<SensorReading>().HasQueryFilter(r =>
-            SecurityContext.Current != null && (
-                SecurityContext.Current.IsAdmin || 
+
+        modelBuilder.Entity<SensorReading>().HasQueryFilter(d =>
+            this.AccessContext.IsAuthenticated && (
+                this.AccessContext.IsAdmin || 
                 AccessPolicies.Any(p => 
-                    p.UserId == SecurityContext.Current.UserId && p.IsActive && 
-                    (p.ExpiresAt == null || p.ExpiresAt > now) &&
+                    p.UserId == this.AccessContext.UserId && p.IsActive && 
+                    (p.ExpiresAt == null || p.ExpiresAt > DateTime.UtcNow) &&
                     (
                         (p.AllowedSite == null || p.AllowedSite == r.Device!.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == r.Device!.Department) &&
@@ -86,12 +87,12 @@ public class AppDbContext : DbContext
             )
         );
 
-        modelBuilder.Entity<BedAssignment>().HasQueryFilter(b =>
-            SecurityContext.Current != null && (
-                SecurityContext.Current.IsAdmin || 
+        modelBuilder.Entity<BedAssignment>().HasQueryFilter(d =>
+            this.AccessContext.IsAuthenticated && (
+                this.AccessContext.IsAdmin || 
                 AccessPolicies.Any(p => 
-                    p.UserId == SecurityContext.Current.UserId && p.IsActive && 
-                    (p.ExpiresAt == null || p.ExpiresAt > now) &&
+                    p.UserId == this.AccessContext.UserId && p.IsActive && 
+                    (p.ExpiresAt == null || p.ExpiresAt > DateTime.UtcNow) &&
                     (
                         (p.AllowedSite == null || p.AllowedSite == b.Device!.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == b.Device!.Department) &&

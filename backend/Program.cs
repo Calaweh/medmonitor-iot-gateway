@@ -148,6 +148,8 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+builder.Services.AddScoped<UserAccessContext>();
+
 builder.Services.AddScoped(typeof(ReadingService));
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<MedicationService>();
@@ -225,32 +227,21 @@ app.Use(async (context, next) =>
     var userIdString = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     var userRole = context.User?.FindFirst(ClaimTypes.Role)?.Value;
 
-    try
-    {
-        if (!string.IsNullOrEmpty(userIdString) && Guid.TryParse(userIdString, out var userId))
-        {
-            SecurityContext.Current = new UserAccessContext
-            {
-                IsAdmin = (userRole == "admin"),
-                UserId = userId
-            };
-        }
-        else
-        {
-            // Unauthenticated or system-level request
-            SecurityContext.Current = null;
-        }
+    // Resolve the scoped instance for THIS specific HTTP request
+    var accessContext = context.RequestServices.GetRequiredService<UserAccessContext>();
 
-        // Proceed to Controllers / SignalR Hubs
-        await next();
-    }
-    finally
+    if (!string.IsNullOrEmpty(userIdString) && Guid.TryParse(userIdString, out var userId))
     {
-        // CRITICAL: Wipe the AsyncLocal context at the end of the HTTP request.
-        // This prevents thread pollution, ensuring User A's policies don't leak 
-        // into User B's request when Kestrel reuses the thread.
-        SecurityContext.Current = null;
+        accessContext.IsAuthenticated = true;
+        accessContext.IsAdmin = (userRole == "admin");
+        accessContext.UserId = userId;
     }
+    else
+    {
+        accessContext.IsAuthenticated = false;
+    }
+
+    await next();
 });
 
 app.MapControllers();

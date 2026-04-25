@@ -88,8 +88,11 @@ def simulate_device(device_code: str, row_offset: int):
             "recordedAt": datetime.now(timezone.utc).isoformat(),
             "payload": payload,
         }
-        headers = {"X-Correlation-ID": correlation_id}
-
+        headers = {
+            "X-Correlation-ID": correlation_id,
+            "X-Device-Key": os.getenv("DEVICE_API_KEY", "DEV_DEFAULT_KEY_123!")
+        }
+        
         alert = check_alert(payload)
         if alert:
             print(f"[{device_code}] ⚠️  ALERT: {alert}")
