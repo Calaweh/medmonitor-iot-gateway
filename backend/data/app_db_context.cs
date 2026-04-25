@@ -34,11 +34,11 @@ public class AppDbContext : DbContext
         base.OnModelCreating(modelBuilder);
         
         // JSONB mapping
-        // JSONB mapping
         modelBuilder.Entity<SensorReading>().Property(e => e.Payload).HasColumnType("jsonb");
         modelBuilder.Entity<AuditLog>().Property(e => e.Detail).HasColumnType("jsonb");
 
         // ─── ABAC / Multi-Tenant Native Subquery Filters ───────────────────────────────
+
         modelBuilder.Entity<Device>().HasQueryFilter(d =>
             this.AccessContext.IsAuthenticated && (
                 this.AccessContext.IsAdmin || 
@@ -49,13 +49,13 @@ public class AppDbContext : DbContext
                         (p.AllowedSite == null || p.AllowedSite == d.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == d.Department) &&
                         (p.AllowedRoom == null || p.AllowedRoom == d.Room) ||
-                        (p.AllowedLabels != null && p.AllowedLabels.Any(l => d.Labels.Contains(l)))
+                        (p.AllowedLabels != null && d.Labels != null && p.AllowedLabels.Any(l => d.Labels.Contains(l)))
                     )
                 )
             )
         );
 
-        modelBuilder.Entity<Alert>().HasQueryFilter(d =>
+        modelBuilder.Entity<Alert>().HasQueryFilter(a =>
             this.AccessContext.IsAuthenticated && (
                 this.AccessContext.IsAdmin || 
                 AccessPolicies.Any(p => 
@@ -65,13 +65,13 @@ public class AppDbContext : DbContext
                         (p.AllowedSite == null || p.AllowedSite == a.Device!.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == a.Device!.Department) &&
                         (p.AllowedRoom == null || p.AllowedRoom == a.Device!.Room) ||
-                        (p.AllowedLabels != null && p.AllowedLabels.Any(l => a.Device!.Labels.Contains(l)))
+                        (p.AllowedLabels != null && a.Device!.Labels != null && p.AllowedLabels.Any(l => a.Device!.Labels.Contains(l)))
                     )
                 )
             )
         );
-
-        modelBuilder.Entity<SensorReading>().HasQueryFilter(d =>
+        
+        modelBuilder.Entity<SensorReading>().HasQueryFilter(r =>
             this.AccessContext.IsAuthenticated && (
                 this.AccessContext.IsAdmin || 
                 AccessPolicies.Any(p => 
@@ -81,13 +81,13 @@ public class AppDbContext : DbContext
                         (p.AllowedSite == null || p.AllowedSite == r.Device!.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == r.Device!.Department) &&
                         (p.AllowedRoom == null || p.AllowedRoom == r.Device!.Room) ||
-                        (p.AllowedLabels != null && p.AllowedLabels.Any(l => r.Device!.Labels.Contains(l)))
+                        (p.AllowedLabels != null && r.Device!.Labels != null && p.AllowedLabels.Any(l => r.Device!.Labels.Contains(l)))
                     )
                 )
             )
         );
 
-        modelBuilder.Entity<BedAssignment>().HasQueryFilter(d =>
+        modelBuilder.Entity<BedAssignment>().HasQueryFilter(b =>
             this.AccessContext.IsAuthenticated && (
                 this.AccessContext.IsAdmin || 
                 AccessPolicies.Any(p => 
@@ -97,7 +97,7 @@ public class AppDbContext : DbContext
                         (p.AllowedSite == null || p.AllowedSite == b.Device!.Site) &&
                         (p.AllowedDepartment == null || p.AllowedDepartment == b.Device!.Department) &&
                         (p.AllowedRoom == null || p.AllowedRoom == b.Device!.Room) ||
-                        (p.AllowedLabels != null && p.AllowedLabels.Any(l => b.Device!.Labels.Contains(l)))
+                        (p.AllowedLabels != null && b.Device!.Labels != null && p.AllowedLabels.Any(l => b.Device!.Labels.Contains(l)))
                     )
                 )
             )
