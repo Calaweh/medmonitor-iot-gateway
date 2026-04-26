@@ -142,6 +142,14 @@ public class ReadingService
             }
         }
 
+        // ── Rule E: MEWS Composite Score ──────────────────────────────────
+        int mewsScore = CalculateMews(dto.Payload);
+        if (mewsScore >= 4 && !recentAlertTypes.Contains("HIGH_MEWS_SCORE"))
+        {
+            activeAlertsToSave.Add(CreateAlert(device.Id, reading, "HIGH_MEWS_SCORE", "CRITICAL",
+                $"Patient Deterioration Warning (MEWS = {mewsScore}). Immediate clinical review required."));
+        }
+
         if (activeAlertsToSave.Any())
             _db.Alerts.AddRange(activeAlertsToSave);
 
@@ -230,5 +238,41 @@ public class ReadingService
             r.RecordedAt,
             Payload = r.Payload
         });
+    }
+
+    private int CalculateMews(JsonElement payload)
+    {
+        int score = 0;
+
+        // 1. Heart Rate (bpm)
+        if (payload.TryGetProperty("heart_rate", out var hrProp) && hrProp.TryGetDouble(out var hr))
+        {
+            if (hr <= 40 || hr >= 130) score += 2;
+            else if (hr <= 50 || (hr >= 111 && hr <= 129)) score += 1;
+        }
+
+        // 2. Respiratory Rate (respiration)
+        if (payload.TryGetProperty("respiration", out var rrProp) && rrProp.TryGetDouble(out var rr))
+        {
+            if (rr < 9 || rr > 29) score += 2;
+            else if (rr >= 21 && rr <= 29) score += 2; 
+        }
+
+        // 3. Systolic BP (systolic_bp)
+        if (payload.TryGetProperty("systolic_bp", out var sbpProp) && sbpProp.TryGetDouble(out var sbp))
+        {
+            if (sbp <= 70) score += 3;
+            else if (sbp <= 80) score += 2;
+            else if (sbp <= 100) score += 1;
+            else if (sbp >= 200) score += 2;
+        }
+
+        // 4. Temperature (temperature)
+        if (payload.TryGetProperty("temperature", out var tProp) && tProp.TryGetDouble(out var temp))
+        {
+            if (temp < 35.0 || temp >= 38.5) score += 2;
+        }
+
+        return score;
     }
 }
