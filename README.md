@@ -5,13 +5,13 @@
 ![Region](https://img.shields.io/badge/Region-ASEAN_(PDPA/HSA)-orange)
 ![Tech Stack](https://img.shields.io/badge/.NET_8-React_19-512BD4)
 
-MedMonitor is an open-source, pre-compliant **Medical IoT Gateway** and real-time vital signs dashboard. It is specifically designed for **MIC@Home** (Mobile Inpatient Care at Home) and hospital step-down wards in the ASEAN region. 
+MedMonitor is an open-source, pre-compliant **Medical IoT Gateway** and real-time vital signs dashboard. It is specifically designed demonstrating feasibility for **MIC@Home** (Mobile Inpatient Care at Home) and hospital step-down wards in the ASEAN region. 
 
 ---
 
 # ⚠️ IMPORTANT DISCLAIMER – NOT A MEDICAL DEVICE
 
-**This software is provided for RESEARCH, DEVELOPMENT, AND EDUCATIONAL PURPOSES ONLY.**  
+**This software is provided for RESEARCH, DEVELOPMENT, INVESTIGATIONAL/PROTOTYPE, AND EDUCATIONAL PURPOSES ONLY.**  
 It is **NOT** a medical device, **NOT** cleared or approved by any regulatory agency (such as Singapore HSA, Malaysia MDA, US FDA, or EMA), and **NOT** intended for clinical use.
 
 ### 🔬 Data Source & Synthetic Nature
