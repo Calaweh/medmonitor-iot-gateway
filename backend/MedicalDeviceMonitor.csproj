@@ -11,14 +11,15 @@
   <ItemGroup>
     <!-- PostgreSQL / Supabase connectivity -->
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.15">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
 
     <!-- JWT Authentication -->
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.26" />
  
     <!-- Structured logging → Grafana Loki -->
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
@@ -29,7 +30,7 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
 
     <!-- BCrypt for password hashing -->
-    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
 
     <!-- PDF shift handover report generation (S4) -->
     <PackageReference Include="QuestPDF" Version="2024.10.4" />
@@ -39,11 +40,14 @@
 
     <!-- Hangfire - background jobs -->
     <PackageReference Include="Hangfire.Core" Version="1.8.*" />
-    <PackageReference Include="Hangfire.PostgreSql" Version="1.20.*" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.21.*" />
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.*" />
     
     <!-- 2FA / TOTP -->
     <PackageReference Include="Otp.NET" Version="1.3.0" />
+
+    <!-- In-Memory Cache for rate limiting / short-term storage -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.15" />
     
   </ItemGroup>
 
