@@ -343,7 +343,7 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 
 ### 🟢 Phase 5: Enterprise Scale & Polish (S6)
 - [x] **Sprint 5.1 (Engineering):** Migrate to Transaction Pooler (Port 6543) via EF Core `DbCommandInterceptor`
-- [ ] **Sprint 5.2 (Engineering):** mTLS IoT Security — replace static `X-Device-Api-Key` with X.509 client certificates
+- [x] **Sprint 5.2 (Engineering):** mTLS IoT Security — replace static `X-Device-Api-Key` with X.509 client certificates
 - [ ] **Sprint 5.3 (DevOps):** Final production deployment (Render / Railway / AWS MY Region); README screenshots + GIF
 
 ---

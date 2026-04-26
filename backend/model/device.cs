@@ -33,4 +33,7 @@ public class Device
     
     [Column("api_key_hash")] 
     public string? ApiKeyHash { get; set; }
+
+    [Column("certificate_thumbprint")] 
+    public string? CertificateThumbprint { get; set; }
 }

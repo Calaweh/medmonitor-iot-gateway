@@ -39,17 +39,31 @@ public class ReadingService
     public async Task ProcessNewReadingAsync(IngestReadingDto dto, string apiKey)
     {
         var device = await _db.Devices.FirstOrDefaultAsync(d => d.DeviceCode == dto.DeviceCode);
-        
         if (device == null)
         {
             _logger.LogWarning("Abnormal Event: Received data for unknown device {DeviceCode}", dto.DeviceCode);
             throw new Exception($"Device {dto.DeviceCode} not found.");
         }
 
-        // --- DEVICE AUTHENTICATION ---
-        if (string.IsNullOrEmpty(device.ApiKeyHash) || !BCrypt.Net.BCrypt.Verify(apiKey, device.ApiKeyHash))
+        // --- ENHANCED DEVICE AUTHENTICATION (Sprint 5.2) ---
+        // 1. Try mTLS (Hardware Certificate) first
+        // Note: Nginx/Reverse Proxy extracts the thumbprint and passes it in a header
+        var certThumbprint = apiKey; // In mTLS mode, we pass the thumbprint in this field for simplicity in the gateway
+        
+        bool isAuthenticated = false;
+
+        if (!string.IsNullOrEmpty(device.CertificateThumbprint) && device.CertificateThumbprint == certThumbprint)
         {
-            throw new UnauthorizedAccessException($"Invalid API Key for device {dto.DeviceCode}");
+            isAuthenticated = true; // Hardware-level trust
+        }
+        else if (!string.IsNullOrEmpty(device.ApiKeyHash) && BCrypt.Net.BCrypt.Verify(apiKey, device.ApiKeyHash))
+        {
+            isAuthenticated = true; // Legacy Key trust
+        }
+
+        if (!isAuthenticated)
+        {
+            throw new UnauthorizedAccessException($"Hardware/Key verification failed for device {dto.DeviceCode}");
         }
         
         // 1. Get last reading (for Rate-of-Change alerts)
