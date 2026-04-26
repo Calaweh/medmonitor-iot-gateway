@@ -41,15 +41,12 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginDto request)
     {
         var user = await _db.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
-        
         if (user == null)
             return Unauthorized(new { error = "User not found in the database." });
-            
         if (!user.IsActive)
             return Unauthorized(new { error = "This account is inactive." });
 
         bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-        
         if (!isPasswordValid)
             return Unauthorized(new { error = "Invalid credentials." });
 
@@ -60,14 +57,13 @@ public class AuthController : ControllerBase
                 return Unauthorized(new { error = "2FA_REQUIRED", message = "Two-factor authentication code required." });
 
             var totp = new Totp(Base32Encoding.ToBytes(user.TotpSecret));
-            // Allows a 1-step drift (30 seconds before/after) to account for slight clock desync
             if (!totp.VerifyTotp(request.TwoFactorCode, out long timeStepMatched, window: new VerificationWindow(1, 1)))
                 return Unauthorized(new { error = "INVALID_2FA", message = "Invalid or expired 2FA code." });
         }
 
-        var token = GenerateJwtToken(user);
+        var token = await GenerateJwtTokenAsync(user); // Switched to Async
+
         _logger.LogInformation("User {Email} logged in successfully.", user.Email);
-        
         return Ok(new 
         { 
             Token = token,
@@ -121,22 +117,38 @@ public class AuthController : ControllerBase
         return BadRequest(new { error = "Invalid verification code." });
     }
 
-    private string GenerateJwtToken(Models.User user)
+    private async Task<string> GenerateJwtTokenAsync(Models.User user)
     {
         var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") 
             ?? _config["Jwt:Secret"] 
             ?? "FallbackSecretKeyThatIsAtLeast32BytesLong!";
-            
+
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim(ClaimTypes.Role, user.Role),
-            new Claim("FullName", user.FullName)
+            new Claim("FullName", user.FullName),
+            // Ensure the Database RLS context is baked into the immutable token
+            new Claim("DepartmentId", user.DepartmentId?.ToString() ?? "")
         };
+
+        // Bridge legacy string roles to the new dynamic RBAC schema
+        var permissions = await _db.Database.SqlQueryRaw<string>(@"
+            SELECT DISTINCT p.resource || ':' || p.action as ""Value""
+            FROM permissions p
+            JOIN role_permissions rp ON p.id = rp.permission_id
+            JOIN roles r ON r.id = rp.role_id
+            WHERE LOWER(r.name) = LOWER({0})
+        ", user.Role).ToListAsync();
+
+        foreach (var p in permissions)
+        {
+            claims.Add(new Claim("Permission", p)); // Embed the capabilities 
+        }
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],

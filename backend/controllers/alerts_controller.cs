@@ -1,6 +1,7 @@
 using MedicalDeviceMonitor.Data;
 using MedicalDeviceMonitor.Models;
 using MedicalDeviceMonitor.Services;
+using MedicalDeviceMonitor.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,7 @@ public class AlertsController : ControllerBase
     }
 
     [HttpGet]
+    [RequirePermission("alerts:view")]
     public async Task<IActionResult> GetActiveAlerts([FromQuery] string? deviceCode)
     {
         var query = _db.Alerts.Include(a => a.Device).AsQueryable();
@@ -44,6 +46,7 @@ public class AlertsController : ControllerBase
     }
 
     [HttpPost("{id}/resolve")]
+    [RequirePermission("alerts:resolve")] 
     public async Task<IActionResult> ResolveAlert(long id)
     {
         var strategy = _db.Database.CreateExecutionStrategy();

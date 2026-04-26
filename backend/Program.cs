@@ -224,12 +224,11 @@ app.Use(async (context, next) =>
 {
     var userIdString = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     var userRole     = context.User?.FindFirst(ClaimTypes.Role)?.Value;
-
+    var deptIdString = context.User?.FindFirst("DepartmentId")?.Value; // Extract Department
+    
     // Detect system-level requests (like the Python Simulator hitting the Ingest API)
     bool isSystemIngest = false;
     
-    // We allow the ingest endpoint to bypass RLS here so the controller can load 
-    // the device from the database and cryptographically verify the X-Device-Api-Key.
     if (string.IsNullOrEmpty(userIdString) && context.Request.Path.StartsWithSegments("/api/readings/ingest", StringComparison.OrdinalIgnoreCase))
     {
         isSystemIngest = true;
@@ -238,22 +237,23 @@ app.Use(async (context, next) =>
     var db = context.RequestServices.GetRequiredService<AppDbContext>();
 
     // 1. EXPLICITLY OPEN THE CONNECTION
-    // This forces EF Core to keep the same physical connection for the entire HTTP request,
-    // ensuring our Postgres Session Variables survive across multiple queries.
     await db.Database.OpenConnectionAsync();
+
     try
     {
         if (!string.IsNullOrEmpty(userIdString))
         {
-            // FALSE is correct here because we are using Port 5432 (Session pooling)
+            // Inject all 3 RLS boundary variables into the Postgres Session
             await db.Database.ExecuteSqlRawAsync(
-                "SELECT set_config('app.current_user_id', {0}, false)",
-                userIdString
+                "SELECT set_config('app.current_user_id', {0}, false), " +
+                "       set_config('app.user_role', {1}, false), " +
+                "       set_config('app.user_dept_id', {2}, false)",
+                userIdString, userRole ?? "", deptIdString ?? ""
             );
         }
         else if (isSystemIngest)
         {
-            // System processes bypass RLS
+            // System processes bypass RLS (used strictly for edge data ingestion)
             await db.Database.ExecuteSqlRawAsync("SELECT set_config('app.user_role', 'system', false)");
         }
 
@@ -262,12 +262,13 @@ app.Use(async (context, next) =>
     finally
     {
         // PREVENT ADO.NET CONNECTION POOL POISONING
-        // Clears the session variables before the connection is returned to the pool.
+        // Clears ALL session variables before the connection is returned to the pool
         await db.Database.ExecuteSqlRawAsync(
             "SELECT set_config('app.current_user_id', '', false), " +
-            "       set_config('app.user_role', '', false)"
+            "       set_config('app.user_role', '', false), " +
+            "       set_config('app.user_dept_id', '', false)"
         );
-        
+
         // 2. EXPLICITLY CLOSE THE CONNECTION
         await db.Database.CloseConnectionAsync();
     }

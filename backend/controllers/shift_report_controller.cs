@@ -1,5 +1,6 @@
 using MedicalDeviceMonitor.Data;
 using MedicalDeviceMonitor.Services;
+using MedicalDeviceMonitor.Authorization; 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,7 @@ public class ShiftReportController : ControllerBase
     /// GET /api/shiftreport/{deviceCode}?hours=8
     /// </summary>
     [HttpGet("{deviceCode}")]
+    [RequirePermission("reports:download")]
     public async Task<IActionResult> GenerateShiftReport(
         string deviceCode,
         [FromQuery] int hours = 8)

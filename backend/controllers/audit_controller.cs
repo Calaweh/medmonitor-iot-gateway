@@ -1,10 +1,11 @@
 using MedicalDeviceMonitor.Services;
+using MedicalDeviceMonitor.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MedicalDeviceMonitor.Controllers;
 
-[Authorize(Roles = "admin")]
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class AuditController : ControllerBase
@@ -17,6 +18,7 @@ public class AuditController : ControllerBase
     }
 
     [HttpGet("verify")]
+    [RequirePermission("audit:view")]
     public async Task<IActionResult> VerifyAuditChain()
     {
         bool isValid = await _auditService.VerifyChainAsync();

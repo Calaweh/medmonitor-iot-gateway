@@ -1,6 +1,7 @@
 using MedicalDeviceMonitor.Data;
 using MedicalDeviceMonitor.Services;
 using MedicalDeviceMonitor.Models;
+using MedicalDeviceMonitor.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ public class PatientsController : ControllerBase
     }
 
     [HttpPost("debug/check-meds")]
+    [RequirePermission("users:manage")] 
     public async Task<IActionResult> TriggerMedCheck()
     {
         await _medService.CheckOverdueMedicationsAsync();
@@ -31,6 +33,7 @@ public class PatientsController : ControllerBase
     }
 
     [HttpGet("{id}/export")]
+    [RequirePermission("patients:export")]
     public async Task<IActionResult> ExportPatientData(Guid id)
     {
         var patient = await _db.Patients.FindAsync(id);
@@ -61,6 +64,7 @@ public class PatientsController : ControllerBase
     }
 
     [HttpPost("{id}/discharge")]
+    [RequirePermission("patients:admit")]
     public async Task<IActionResult> DischargePatient(Guid id, [FromQuery] string? notes)
     {
         var strategy = _db.Database.CreateExecutionStrategy();
