@@ -11,6 +11,7 @@
   <ItemGroup>
     <!-- PostgreSQL / Supabase connectivity -->
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.4">
       <PrivateAssets>all</PrivateAssets>
