@@ -1,6 +1,6 @@
 # MedMonitor: Open-Source Medical IoT Telemetry Gateway (SaMD)
 
-![License: MIT](https://img.shields.io/github/license/Calaweh/medmonitor-iot-gateway?color=blue)
+[![License: MIT](https://img.shields.io/github/license/Calaweh/medmonitor-iot-gateway?label=License&color=blue)](LICENSE)
 ![Compliance](https://img.shields.io/badge/Compliance-IEC_62304_Class_B_Aligned-success)
 ![Region](https://img.shields.io/badge/Region-ASEAN_(PDPA/HSA)-orange)
 ![Tech Stack](https://img.shields.io/badge/.NET_8-React_19-512BD4)

@@ -3,6 +3,8 @@
 
 Per IEC 62304, third-party software components incorporated into the medical device must be evaluated for risk.
 
+Third-party dependencies are monitored 24/7 via GitHub Dependabot. Version updates are verified via automated CI status checks and manually validated by a maintainer before merging into the main branch.
+
 | Component | Version | Purpose | Risk Evaluation & Mitigation |
 | :--- | :--- | :--- | :--- |
 | **.NET 8** | 8.0.x | Backend Framework | Low risk. Maintained by Microsoft. Mitigated via extensive automated health checks. |
