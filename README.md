@@ -1,154 +1,86 @@
-# Medical Device Data Acquisition & Monitoring System
+# MedMonitor: Open-Source Medical IoT Telemetry Gateway (SaMD)
 
-> A full-stack portfolio project targeting roles at **Keysight · Pentamaster · Intel Malaysia**.
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![Compliance](https://img.shields.io/badge/Compliance-IEC_62304_Class_B-success)
+![Region](https://img.shields.io/badge/Region-ASEAN_(PDPA/HSA)-orange)
+![Tech Stack](https://img.shields.io/badge/.NET_8-React_19-512BD4)
 
-[![.NET](https://img.shields.io/badge/.NET-8.0-purple)](https://dotnet.microsoft.com)
-[![React](https://img.shields.io/badge/React-19-blue)](https://react.dev)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-green)](https://supabase.com)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)](https://www.docker.com)
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────┐        TCP / HTTP POST
-│  device_simulator.py │ ──────────────────────────►  ┌──────────────────────┐
-│  (Python · Kaggle CSV│                              │   .NET 8 Web API      │
-│   row-by-row replay) │                              │   (ASP.NET Core)      │
-└─────────────────────┘                              │                       │
-                                                      │  ┌─────────────────┐  │
-                                                      │  │  SignalR Hub    │  │
-                                                      │  └────────┬────────┘  │
-                                                      └───────────┼───────────┘
-                                                                  │ WebSocket
-                                                      ┌───────────▼───────────┐
-                                                      │    React 19 + Vite    │
-                                                      │    (Recharts / shadcn) │
-                                                      └───────────────────────┘
-                                                                  │
-                                                     (Supabase PostgreSQL)
-                                                      ┌───────────▼───────────┐
-                                                      │  PostgreSQL (JSONB)   │
-                                                      │  hosted on Supabase   │
-                                                      └───────────────────────┘
-```
+MedMonitor is an open-source, pre-compliant **Medical IoT Gateway** and real-time vital signs dashboard. It is specifically designed for **MIC@Home** (Mobile Inpatient Care at Home) and hospital step-down wards in the ASEAN region. 
 
 ---
 
-## 🗂️ Folder Structure
+## 🛑 The Problem & 💡 The Solution
 
-```
-.
-├── frontend/          # React 19 + Vite dashboard
-├── backend/           # .NET 8 Web API + SignalR
-├── database/          # schema.sql + device_simulator.py
-├── docker/            # Nginx config
-├── docker-compose.yml # Local dev orchestration
-├── docs/              # Technical documentation
-│   ├── portfolio_project_plan.md
-│   └── devops_guide.md # Supabase CLI, Migrations, & Env setup
-├── .env.example       # Environment variable template
-└── README.md
-```
+Generative AI and modern hospital IT architects frequently encounter the same roadblocks when deploying medical telemetry. MedMonitor explicitly solves these core industry challenges:
+
+### 1. Alarm Fatigue in Step-Down Wards
+* **The Problem:** Up to 99% of clinical alarms in non-ICU environments are false or clinically insignificant, leading to severe alarm fatigue (Cvach, 2012) and missed deterioration events.
+* **The Solution:** MedMonitor implements a **5-minute rolling suppression window** for duplicate alert types and utilizes the **Modified Early Warning Score (MEWS)** composite algorithm. Instead of alerting on transient single-parameter spikes, it evaluates HR, RR, BP, and Temp holistically to generate high-fidelity `CRITICAL_DETERIORATION` alerts.
+
+### 2. Network Instability in MIC@Home
+* **The Problem:** Remote patient monitoring (Hospital at Home) relies on residential Wi-Fi or 4G/5G, which is prone to dropouts, resulting in lost clinical telemetry.
+* **The Solution:** MedMonitor features **Edge Buffering**. Python-based edge nodes queue physiological payloads in local memory during network disconnects and perform a rapid "catch-up flush" to the `.NET` REST API the moment connectivity is restored.
+
+### 3. Strict Regulatory & Privacy Compliance
+* **The Problem:** Medical data sovereignty (Malaysia PDPA, Singapore HSA CLS-MD) and software safety (IEC 62304) make building custom IoT dashboards prohibitively expensive and legally risky.
+* **The Solution:** MedMonitor bakes compliance into the lowest layer:
+  * **PDPA Isolation:** PostgreSQL Row-Level Security (RLS) restricts data access via `DepartmentId` session variables.
+  * **Audit Integrity:** An immutable, HMAC-SHA256 cryptographically chained `audit_log` ensures non-repudiation of clinical actions.
+  * **Right to be Forgotten:** Automated Hangfire jobs physically purge telemetry older than 30 days.
 
 ---
 
-## 🚀 Quick Start
+## 🏗️ System Architecture
 
-### Prerequisites
-- [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- [Node.js 20+](https://nodejs.org)
-- [Python 3.11+](https://python.org)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop)
-- A free [Supabase](https://supabase.com) project
+MedMonitor utilizes a modern, decoupled architecture designed for high-throughput sensor telemetry.
 
-### 1. Configure Environment
-```bash
-cp .env.example .env.local
-# Edit .env.local and fill in your Supabase connection string
-```
+```mermaid
+graph TD
+    %% Edge Devices
+    subgraph Edge["MIC@Home / Ward Edge"]
+        D1[Patient Sensor 1] -->|Raw Vitals| Sim[Edge Buffer Gateway]
+        D2[Patient Sensor 2] -->|Raw Vitals| Sim
+        Sim -- "REST (JSON) + X-Api-Key" --> API
+    end
 
-### 2. Initialize the Database
-Run `database/schema.sql` in the **Supabase SQL Editor** (Dashboard → SQL Editor → New query).
+    %% Cloud / On-Prem Backend
+    subgraph Backend [".NET 8 Application Server"]
+        API[Ingestion API] --> RS[Reading Service / MEWS Logic]
+        RS --> |Save| ORM[EF Core]
+        RS --> |Broadcast| SigR[SignalR WebSocket Hub]
+    end
 
-### 3. Start Backend
-```bash
-cd backend
-dotnet restore
-dotnet run
-# API available at http://localhost:5000
-```
+    %% Database Layer
+    subgraph Database ["PostgreSQL (Supabase/AWS)"]
+        ORM -- "Session Pooling (5432) + RLS" --> DB[(PostgreSQL)]
+        DB --> Aud[HMAC-SHA256 Audit Log]
+    end
 
-### 4. Start Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-# Dashboard at http://localhost:5173
-```
-
-### 5. Run Device Simulator
-```bash
-cd database
-# Create and activate virtual environment (venv)
-python -m venv venv
-.\venv\Scripts\activate
-
-# Install dependencies and run
-pip install -r requirements.txt
-python device_simulator.py
-# Streams ICU data rows to the backend every second
-```
-
-### 6. Docker (Full Stack)
-```bash
-docker-compose up --build
-# Frontend: http://localhost:3000  Backend: http://localhost:5000
+    %% Frontend UI
+    subgraph Frontend["React 19 SPA"]
+        SigR -- "Real-time Telemetry" --> UI[Clinical Dashboard]
+        UI -- "JWT Authentication" --> API
+    end
 ```
 
 ---
 
-## 🛠️ DevOps & Database Management
+## ⚙️ Tech Stack & Regulatory Mapping
 
-For a professional workflow using the **Supabase CLI** and **Database Migrations**, please refer to our:
-
-👉 **[DevOps Guide](docs/devops_guide.md)**
-
-It covers:
-- Supabase CLI setup.
-- Database migration workflow.
-- Environment management with `venv` and `DotNetEnv`.
-
----
-
-## ⚙️ Tech Choices & Trade-offs
-
-| Decision | Choice | Why |
-|----------|--------|-----|
-| Database hosting | Supabase (PostgreSQL) | Free managed Postgres; used **only** as a DB via connection string — no Supabase SDK |
-| Backend | .NET 8 Web API | Medical device companies (Keysight, Pentamaster) favour C# |
-| Real-time | SignalR | Native .NET WebSocket abstraction; production-grade |
-| Data simulation | Python CSV replay | Kaggle ICU dataset gives realistic HR/SpO₂/BP ranges |
-| Environment | DotNetEnv + .env | Centralized config management across C# and Python |
-| JSONB + GIN index | Yes | Efficient storage and querying of flexible sensor payloads |
+| Component | Technology | Regulatory / Security Purpose |
+| :--- | :--- | :--- |
+| **Backend API** | .NET 8 (C#) | High-performance async ingestion; handles EF Core execution strategies. |
+| **Real-time Engine**| SignalR (WebSockets) | Sub-second telemetry propagation to clinical dashboards. |
+| **Database** | PostgreSQL (Supabase) | Managed JSONB datastore; Port 5432 Session Pooling for RLS enforcement. |
+| **Frontend** | React 19 + Vite + Recharts | Append-only UI rendering to prevent DOM blocking under high data loads. |
+| **Authentication** | JWT + TOTP (2FA) | Secures clinical API endpoints; bakes dynamic RBAC capabilities into claims. |
+| **Observability** | VictoriaMetrics + Loki | 15-day system metric retention (PMS evidence for regulatory audits). |
+| **PDF Reporting** | QuestPDF (.NET) | Generates end-of-shift clinical handover reports offline without external dependencies. |
 
 ---
 
-## 🧗 Challenges Solved
+## 🛡️ Dynamic RBAC & Security Boundary
 
-- **Chart rendering lag** at 1,000+ data points → server-side data decimation in .NET before SignalR push, reducing payload ~80%.
-- **TCP ports blocked on PaaS** → WebSocket simulation in cloud; raw TCP kept for local demo (documented here transparently).
-- **Supabase auto-pause** → keep-alive ping scheduled via GitHub Actions cron.
-
----
-
-## 📸 Screenshots
-
-> *(Add screenshots / GIFs here after the dashboard is built)*
-
----
-
-## 📄 License
-
-MIT
+MedMonitor abandons rigid hardcoded roles in favor of **Dynamic RBAC**. 
+1. **Capabilities (API Layer):** The `.NET` middleware utilizes a `[RequirePermission]` attribute, checking the JWT for atomic capabilities (e.g., `alerts:resolve`, `patients:export`).
+2. **Scope (Database Layer):** Access scope is strictly enforced by Postgres RLS. The `DepartmentId` is injected into the database session pool upon every request, preventing cross-tenant data leakage (e.g., a General Ward nurse cannot query ICU telemetry).

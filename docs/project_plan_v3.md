@@ -334,12 +334,12 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 - [x] **Ward Isolation:** Alert resolution restricted to clinician's own department
 
 ### 🚀 Phase 4: Clinical Sandbox & Investigational Testing (S4–S5)
-- [ ] **Sprint 4.1 (Engineering):** Refactor `AuditService.cs` — wrap locks in `BeginTransactionAsync()`.
-- [ ] **Sprint 4.2 (Engineering):** Implement **Dynamic RBAC Schema** and `[RequirePermission]` middleware.
-- [ ] **Sprint 4.3 (Engineering):** Implement **MEWS scoring algorithm** in `ReadingService.cs`.
-- [ ] **Sprint 4.4 (Engineering):** Edge buffering in Python simulator for MIC@Home Wi-Fi dropouts.
-- [ ] **Sprint 4.5 (Regulatory):** Populate `docs/qms-62304/` templates.
-- [ ] **Sprint 4.6 (Clinical):** Finalize CER with citations (IEC 60601-1-8, Cvach 2012).
+- [x] **Sprint 4.1 (Engineering):** Refactor `AuditService.cs` — wrap locks in `BeginTransactionAsync()`.
+- [x] **Sprint 4.2 (Engineering):** Implement **Dynamic RBAC Schema** and `[RequirePermission]` middleware.
+- [x] **Sprint 4.3 (Engineering):** Implement **MEWS scoring algorithm** in `ReadingService.cs`.
+- [x] **Sprint 4.4 (Engineering):** Edge buffering in Python simulator for MIC@Home Wi-Fi dropouts.
+- [x] **Sprint 4.5 (Regulatory):** Populate `docs/qms-62304/` templates.
+- [x] **Sprint 4.6 (Clinical):** Finalize CER with citations (IEC 60601-1-8, Cvach 2012).
 
 ### 🟢 Phase 5: Enterprise Scale & Polish (S6)
 - [ ] **Sprint 5.1 (Engineering):** Migrate to Transaction Pooler (Port 6543) via EF Core `DbCommandInterceptor`
