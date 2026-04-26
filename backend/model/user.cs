@@ -33,4 +33,12 @@ public class User
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Column("department_id")]
+    public Guid? DepartmentId { get; set; }
+
+    [Column("token_version")]
+    public int TokenVersion { get; set; } = 1;
+
+    public Department? Department { get; set; }
 }

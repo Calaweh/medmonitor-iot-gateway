@@ -20,18 +20,22 @@ public class AppDbContext : DbContext
     public DbSet<CalibrationRecord> CalibrationRecords { get; set; }
     public DbSet<MedicationSchedule> MedicationSchedules { get; set; }
     public DbSet<ClinicalNote> ClinicalNotes { get; set; }
-    public DbSet<PatientTransfer> PatientTransfers { get; set; }
-    public DbSet<AccessPolicy> AccessPolicies { get; set; }
+    public DbSet<PatientTransfer> PatientTransfers { get; set; } 
+    public DbSet<Department> Departments { get; set; }
+    public DbSet<Permission> Permissions { get; set; }
+    public DbSet<Role> Roles { get; set; }
+    public DbSet<Group> Groups { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        
-        // JSONB mapping
+
+        // JSONB mapping for Postgres
         modelBuilder.Entity<SensorReading>().Property(e => e.Payload).HasColumnType("jsonb");
         modelBuilder.Entity<AuditLog>().Property(e => e.Detail).HasColumnType("jsonb");
-
-        // NOTE: Row-Level Security (RLS) is now enforced directly in PostgreSQL.
-        // See supabase/migrations/20260430000000_rls_policies.sql
+        
+        // Ensure decimal precision for vitals if needed
+        modelBuilder.Entity<PatientThreshold>().Property(p => p.MinValue).HasColumnType("decimal");
+        modelBuilder.Entity<PatientThreshold>().Property(p => p.MaxValue).HasColumnType("decimal");
     }
 }
