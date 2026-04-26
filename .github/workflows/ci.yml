@@ -1,0 +1,34 @@
+name: Medical Software Validation (CI)
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore & Build Backend
+        run: |
+          cd backend
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install & Build Frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
