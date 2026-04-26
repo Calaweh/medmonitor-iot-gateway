@@ -241,16 +241,14 @@ app.Use(async (context, next) =>
     // This forces EF Core to keep the same physical connection for the entire HTTP request,
     // ensuring our Postgres Session Variables survive across multiple queries.
     await db.Database.OpenConnectionAsync();
-
     try
     {
         if (!string.IsNullOrEmpty(userIdString))
         {
-            // Set session variables for RLS evaluation
+            // FALSE is correct here because we are using Port 5432 (Session pooling)
             await db.Database.ExecuteSqlRawAsync(
-                "SELECT set_config('app.current_user_id', {0}, false), " +
-                "       set_config('app.user_role', {1}, false)",
-                userIdString, userRole ?? "clinician"
+                "SELECT set_config('app.current_user_id', {0}, false)",
+                userIdString
             );
         }
         else if (isSystemIngest)
@@ -292,10 +290,5 @@ using (var scope = app.Services.CreateScope())
         svc => svc.CheckOverdueMedicationsAsync(),
         "*/15 * * * *");
 }
-
-var testHash = BCrypt.Net.BCrypt.HashPassword("DeviceSecret123!");
-Console.WriteLine("================================================");
-Console.WriteLine($"VALID .NET HASH: {testHash}");
-Console.WriteLine("================================================");
 
 app.Run();

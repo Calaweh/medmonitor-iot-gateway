@@ -1,53 +1,47 @@
-# Security & Compliance Architecture
+# Security & Regulatory Compliance Architecture
 
-This document details the security posture of the MedMonitor application, focusing on requirements for **IEC 62304 Class B** and general healthcare data compliance (e.g., HIPAA).
+This document details the security posture of the MedMonitor application, mapping specifically to **IEC 62304 Class B**, the **Malaysian PDPA**, and the **Singapore HSA Cybersecurity Labeling Scheme (CLS-MD)**.
 
-## 1. Data At-Rest Encryption (TDE)
+## 1. Fine-Grained Access Control (Dynamic RBAC)
 
-**Status:** Enabled (via Cloud Provider)
+**Status:** In Progress (Phase 4)
+**Regulatory Map:** HSA CLS-MD (Access Control), IEC 62304 (Segregation of Critical Items)
 
-MedMonitor relies on Supabase as its managed PostgreSQL database provider. Supabase runs on AWS infrastructure, which provides **Transparent Data Encryption (TDE)** at rest by default using AES-256 encryption.
+MedMonitor employs a dynamic, database-driven permission model that separates "Capability" from "Data Scope."
 
-- **Storage Level:** All RDS instances backing Supabase are encrypted at the EBS volume level.
-- **Backups:** Automated snapshots and Point-In-Time Recovery (PITR) logs are encrypted at rest.
-- **Action Required:** No further application-level implementation is required.
+*   **Atomic Permissions:** Actions are granular (e.g., `patients:threshold:write`). This allows hospital admins to create custom clinical roles without modifying application code.
+*   **JWT Permission Claims:** At login, the backend resolves the user's effective permissions (calculated from Group and Role memberships) and embeds them as a claim in the JWT.
+*   **Middleware Enforcement:** Every API request is intercepted by a `.NET PermissionMiddleware`. If the JWT lacks the specific atomic permission required for the endpoint, an HTTP 403 Forbidden is returned.
+*   **System Role Protection:** Critical clinical roles are flagged as `is_system_role`. This prevents administrative users from accidentally removing essential life-safety capabilities (like alert resolution) from clinical staff.
 
 ## 2. Hash-Chained Audit Log Integrity
 
-**Status:** Implemented
+**Status:** Implemented (Session Pooling Mode)
+**Regulatory Map:** HSA CLS-MD Level 2 (Data Isolation), HIPAA
 
-To ensure non-repudiation and detect tampering by privileged accounts (e.g., direct database modifications), the `audit_log` table employs cryptographic hash chaining.
+While permissions allow a user to *perform* an action, Row-Level Security (RLS) dictates *where* they can perform it.
+*   **The Scope Check:** Even if a nurse has the `alerts:resolve` permission, the database RLS policy (on Port 5432) ensures they can only query and update alerts where the `device.department_id` matches the user's assigned department.
 
-- **Mechanism:** Each audit log entry calculates an HMAC-SHA256 hash using:
-  `Hash(UserId | Action | EntityType | EntityId | Detail | OccurredAt | PreviousHash)`
-- **Secret:** The hash uses a server-side secret (`AUDIT_HMAC_SECRET`) that is never exposed to the database.
-- **Verification:** An administrative endpoint (`GET /api/audit/verify`) traverses the chain to verify that no records have been altered, deleted, or inserted out of sequence.
+## 3. Automated Data Retention & De-identification
 
-## 3. Two-Factor Authentication (2FA) / TOTP
+**Status:** Implemented (Refactoring for concurrency in Sprint 4.1)
+**Regulatory Map:** HSA CLS-MD (Tampering Detection), IEC 62304 (Traceability)
 
-**Status:** Planned 
+To ensure non-repudiation and detect tampering by privileged accounts, the `audit_log` table employs cryptographic hash chaining (HMAC-SHA256).
+*   **Non-Repudiation:** Every action is linked to a `user_id` and a verified `permission` claim, ensuring clinical accountability.
+*   **Chain Verification:** Administrative users can trigger a chain verification to prove the log's integrity from the first entry.
 
-To secure clinician access, Time-Based One-Time Passwords (TOTP) will be introduced via the `Authenticator` app protocol.
+## 4. Device Authentication (Edge Security)
 
-### Implementation Blueprint:
-1. Add `totp_secret` (encrypted) and `is_totp_enabled` to the `users` table.
-2. Provide `/api/auth/setup-totp` to generate the seed and a QR Code compliant `otpauth://` URI.
-3. Update login payload: if `is_totp_enabled` = true, return an intermediate JWT requiring 2FA code validation before providing the fully fledged clinical JWT.
+**Status:** Implemented (API Key Hashing)
+**Regulatory Map:** HSA CLS-MD (Authentication)
 
-## 4. Ward-Scoped Query Isolation
-Implemented via Entity Framework Core Global Query Filters (`WardContext`), mathematically isolating queries at the ORM boundary so that clinicians can only see devices assigned to their exact geographical ward.
+Medical devices pushing telemetry must be authenticated. 
+* Devices submit an `X-Device-Api-Key` HTTP header. 
+* The backend does *not* store this key in plaintext. It is verified against a `BCrypt` hash (`api_key_hash`) stored in the `devices` table, ensuring that a compromised database snapshot cannot be used to spoof device telemetry.
+* *Roadmap:* Future enterprise versions will transition to Mutual TLS (mTLS) utilizing X.509 client certificates at the Nginx reverse-proxy layer.
 
-### Pitfalls & Verification
-1.  **Middleware Ordering:** The isolation middleware is positioned *after* `UseAuthentication()` and `UseAuthorization()`. This ensures `context.User` is populated before ward assignments are loaded.
-2.  **AsyncLocal Lifecycle:** `WardContext.AllowedLocations` is wrapped in a `try...finally` block within the middleware to ensure the context is cleared at the end of every HTTP request, preventing cross-request data leakage.
-3.  **Administrative Bypass:** Admin users have `AllowedLocations` set to `null`, effectively bypassing the global filter to allow total system oversight.
-4.  **Comprehensive Filtering:** Isolation filters are applied not only to the `Device` entity but also to `Alert`, `SensorReading`, and `BedAssignment` via navigation properties, ensuring that guessing a `DeviceCode` does not grant access to sensitive historical data.
+## 5. Data At-Rest Encryption
 
-## 5. Implementation Status Summary
-
-| Requirement | Status | Verification Method |
-| :--- | :--- | :--- |
-| Data At-Rest Encryption | ✅ Enabled | Provider documentation (AWS/Supabase) |
-| Audit Log Integrity | ✅ Implemented | HMAC-SHA256 Chaining + `/api/audit/verify` |
-| Ward Isolation | ✅ Implemented | EF Core Global Query Filters + Middleware |
-| 2FA / TOTP | 📅 Planned | Implementation Blueprint defined |
+**Status:** Enabled via Infrastructure
+MedMonitor relies on managed PostgreSQL (Supabase/AWS). All underlying RDS instances and automated Point-In-Time Recovery (PITR) backups are encrypted at rest using AES-256 at the EBS volume level. No application-layer cryptography is required for data at rest.
