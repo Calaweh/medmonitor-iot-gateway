@@ -1,11 +1,39 @@
 # MedMonitor: Open-Source Medical IoT Telemetry Gateway (SaMD)
 
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Compliance](https://img.shields.io/badge/Compliance-IEC_62304_Class_B-success)
+![License: MIT](https://img.shields.io/github/license/Calaweh/medmonitor-iot-gateway?color=blue)
+![Compliance](https://img.shields.io/badge/Compliance-IEC_62304_Class_B_Aligned-success)
 ![Region](https://img.shields.io/badge/Region-ASEAN_(PDPA/HSA)-orange)
 ![Tech Stack](https://img.shields.io/badge/.NET_8-React_19-512BD4)
 
 MedMonitor is an open-source, pre-compliant **Medical IoT Gateway** and real-time vital signs dashboard. It is specifically designed for **MIC@Home** (Mobile Inpatient Care at Home) and hospital step-down wards in the ASEAN region. 
+
+---
+
+# ⚠️ IMPORTANT DISCLAIMER – NOT A MEDICAL DEVICE
+
+**This software is provided for RESEARCH, DEVELOPMENT, AND EDUCATIONAL PURPOSES ONLY.**  
+It is **NOT** a medical device, **NOT** cleared or approved by any regulatory agency (such as Singapore HSA, Malaysia MDA, US FDA, or EMA), and **NOT** intended for clinical use.
+
+### 🔬 Data Source & Synthetic Nature
+MedMonitor is a **functional prototype**. All physiological data processed by this system (Heart Rate, SpO2, BP) is derived from **public Kaggle ICU datasets** or generated via **synthetic simulation**. This project does not collect, process, or store real-world Patient Identifiable Information (PII) or Protected Health Information (PHI).
+
+### ⚖️ Investigational Use Only (IUO)
+This software is intended to demonstrate technical feasibility for medical IoT telemetry. **Any use of this software in a clinical setting or with real patients is strictly prohibited** unless conducted under a formal **Investigational Testing Exemption (ITE)** or within a sanctioned **Regulatory Sandbox** (e.g., Singapore MIC@Home or Malaysia MOH Sandbox) under the supervision of qualified medical professionals.
+
+### ❌ What this software is NOT
+- Not a primary monitoring system for life-critical situations.
+- Not a substitute for professional medical judgment or hospital-grade hardware.
+- Not for generating clinical alerts that lead to immediate medical intervention without human verification.
+
+### ✅ What this software IS
+- A technical demonstration of **IEC 62304 Class B** software architectural patterns.
+- A research tool for testing **PDPA-compliant** data isolation and audit-trail integrity.
+- An open-source reference for **Modified Early Warning Score (MEWS)** algorithm implementation.
+
+### 🔒 Liability Waiver
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+**By using this software, you confirm that you understand and agree to these terms.**
 
 ---
 
