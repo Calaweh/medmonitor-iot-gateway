@@ -137,13 +137,13 @@ public class AuthController : ControllerBase
         };
 
         // Bridge legacy string roles to the new dynamic RBAC schema
-        var permissions = await _db.Database.SqlQueryRaw<string>(@"
+        var permissions = await _db.Database.SqlQueryRaw<PermissionResult>(@"
             SELECT DISTINCT p.resource || ':' || p.action as ""Value""
             FROM permissions p
             JOIN role_permissions rp ON p.id = rp.permission_id
             JOIN roles r ON r.id = rp.role_id
             WHERE LOWER(r.name) = LOWER({0})
-        ", user.Role).ToListAsync();
+        ", user.Role).Select(x => x.Value).ToListAsync();
 
         foreach (var p in permissions)
         {
@@ -158,5 +158,10 @@ public class AuthController : ControllerBase
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public class PermissionResult
+    {
+        public string Value { get; set; } = "";
     }
 }

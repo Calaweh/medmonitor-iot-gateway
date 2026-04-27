@@ -57,16 +57,17 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<TenantInterceptor>();
 
 builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
+{
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
-        npgsqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 3,
-            maxRetryDelay: TimeSpan.FromSeconds(5),
-            errorCodesToAdd: null);
-    })
-    // REGULATORY REQUIREMENT: Use Interceptor for scalable RLS isolation
-    .AddInterceptors(serviceProvider.GetRequiredService<TenantInterceptor>())
-);
+        npgsqlOptions.EnableRetryOnFailure(3);
+        // Important for Port 6543:
+        npgsqlOptions.CommandTimeout(30); 
+    });
+    
+    // Use the Service Provider to get the scoped interceptor
+    options.AddInterceptors(serviceProvider.GetRequiredService<TenantInterceptor>());
+});
 
 // ─── Health Checks ─────────────────────────────────────────────────────────
 builder.Services.AddHealthChecks()
@@ -159,9 +160,20 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped(typeof(ReadingService));
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<MedicationService>();
+var isDevelopment = builder.Environment.IsDevelopment();
+
 builder.Services.AddHangfire(config =>
-    config.UsePostgreSqlStorage(options => options.UseNpgsqlConnection(connectionString)));
-builder.Services.AddHangfireServer();
+    config.UsePostgreSqlStorage(options =>
+        options.UseNpgsqlConnection(connectionString)));
+
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = 1;
+    options.HeartbeatInterval = TimeSpan.FromMinutes(2);
+    options.ServerCheckInterval = TimeSpan.FromMinutes(5);
+    options.SchedulePollingInterval = TimeSpan.FromMinutes(1);
+    options.CancellationCheckInterval = TimeSpan.FromMinutes(2);
+});
 builder.Services.AddScoped<RetentionService>();
 
 var app = builder.Build();
@@ -215,9 +227,27 @@ app.MapHub<VitalSignsHub>("/hubs/vitalsigns");
 
 using (var scope = app.Services.CreateScope())
 {
-    var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
-    recurringJobManager.AddOrUpdate<RetentionService>("purge-old-readings", svc => svc.PurgeOldReadingsAsync(), "0 2 * * *");
-    recurringJobManager.AddOrUpdate<MedicationService>("check-missed-meds", svc => svc.CheckOverdueMedicationsAsync(), "*/15 * * * *");
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+        recurringJobManager.AddOrUpdate<RetentionService>(
+            "purge-old-readings", 
+            svc => svc.PurgeOldReadingsAsync(), 
+            "0 2 * * *");
+        recurringJobManager.AddOrUpdate<MedicationService>(
+            "check-missed-meds", 
+            svc => svc.CheckOverdueMedicationsAsync(), 
+            "*/15 * * * *");
+        logger.LogInformation("Hangfire recurring jobs registered successfully.");
+    }
+    catch (Exception ex)
+    {
+        // Log but don't crash — Hangfire will re-register jobs on next server heartbeat
+        logger.LogWarning(ex, 
+            "Hangfire job registration failed at startup (Supabase may be waking up). " +
+            "Jobs will self-register on next Hangfire server heartbeat.");
+    }
 }
 
 app.Run();

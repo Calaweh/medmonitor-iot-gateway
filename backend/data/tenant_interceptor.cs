@@ -16,22 +16,32 @@ public class TenantInterceptor : DbCommandInterceptor
     private void SetSessionVariables(DbCommand command)
     {
         var user = _httpContextAccessor.HttpContext?.User;
-        if (user?.Identity?.IsAuthenticated == true)
-        {
-            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var userRole = user.FindFirst(ClaimTypes.Role)?.Value;
-            var deptId = user.FindFirst("DepartmentId")?.Value;
+        
+        // Extract claims
+        var userId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+        var userRole = user?.FindFirst(ClaimTypes.Role)?.Value ?? "guest";
+        var deptId = user?.FindFirst("DepartmentId")?.Value ?? "";
 
-            // Prepend the session variable setup to the actual SQL command.
-            // Using Port 6543 requires re-setting these variables for every transaction.
-            command.CommandText = 
-                $"SELECT set_config('app.current_user_id', '{userId}', false); " +
-                $"SELECT set_config('app.user_role', '{userRole}', false); " +
-                $"SELECT set_config('app.user_dept_id', '{deptId}', false); " +
-                command.CommandText;
+        // If it's an Ingest request from the simulator, we might need a system role
+        var path = _httpContextAccessor.HttpContext?.Request.Path.Value ?? "";
+        if (string.IsNullOrEmpty(userId) && path.Contains("/api/readings/ingest"))
+        {
+            userRole = "system";
         }
+
+        // PREVENT POOL POISONING:
+        // Use 'SET LOCAL' so the variables are automatically wiped when the transaction ends.
+        // This is mandatory for Supabase Port 6543.
+        var sqlSetup = $@"
+            SET LOCAL app.current_user_id = '{userId}';
+            SET LOCAL app.user_role = '{userRole}';
+            SET LOCAL app.user_dept_id = '{deptId}';
+        ";
+
+        command.CommandText = sqlSetup + command.CommandText;
     }
 
+    // Wrap both Sync and Async methods
     public override InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
     {
         SetSessionVariables(command);
