@@ -15,6 +15,7 @@ using System.Text;
 using System.Text.Json;
 using MedicalDeviceMonitor.Models;
 using System.Security.Claims;
+using System.Reflection; 
 using Hangfire;
 using Hangfire.PostgreSql;
 
@@ -50,19 +51,25 @@ if (string.IsNullOrEmpty(connectionString))
     throw new InvalidOperationException(
         "SUPABASE_CONN_STRING environment variable or configuration is missing. Check your .env.local file.");
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+// ─── Scalable Security Registration ──────────────────────────────────────────
+// Required for the TenantInterceptor to access the current user's claims
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<TenantInterceptor>();
+
+builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
+{
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
-        npgsqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 3,
-            maxRetryDelay: TimeSpan.FromSeconds(5),
-            errorCodesToAdd: null);
-    })
-);
+        npgsqlOptions.EnableRetryOnFailure(3);
+        // Important for Port 6543:
+        npgsqlOptions.CommandTimeout(30); 
+    });
+    
+    // Use the Service Provider to get the scoped interceptor
+    options.AddInterceptors(serviceProvider.GetRequiredService<TenantInterceptor>());
+});
 
 // ─── Health Checks ─────────────────────────────────────────────────────────
-// /health      → liveness (always 200 if process is up)
-// /health/db   → readiness — confirms Supabase Postgres is reachable
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>(
         name: "database",
@@ -105,10 +112,7 @@ builder.Services.AddControllers();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins(
-                "http://localhost:5173",
-                "http://localhost:3000"
-              )
+        policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
@@ -116,15 +120,20 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 
-// ─── Swagger with JWT bearer auth ──────────────────────────────────────────
+// ─── Swagger with GEO/SEO XML Documentation ──────────────────────────────────
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "MedMonitor API",
-        Version = "v2",
-        Description = "Medical Device Monitoring System — IEC 62304 Class B"
+        Version = "v2.1",
+        Description = "Medical Device Monitoring System — IEC 62304 Class B. Enterprise Scale Edition."
     });
+
+    // Integrate XML Comments into Swagger for AI and Developer GEO
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath);
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -151,13 +160,20 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped(typeof(ReadingService));
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<MedicationService>();
+var isDevelopment = builder.Environment.IsDevelopment();
 
-// Hangfire for scheduled jobs
 builder.Services.AddHangfire(config =>
-    config.UsePostgreSqlStorage(options => options.UseNpgsqlConnection(connectionString)));
-builder.Services.AddHangfireServer();
+    config.UsePostgreSqlStorage(options =>
+        options.UseNpgsqlConnection(connectionString)));
 
-// Register the retention job as a service
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = 1;
+    options.HeartbeatInterval = TimeSpan.FromMinutes(2);
+    options.ServerCheckInterval = TimeSpan.FromMinutes(5);
+    options.SchedulePollingInterval = TimeSpan.FromMinutes(1);
+    options.CancellationCheckInterval = TimeSpan.FromMinutes(2);
+});
 builder.Services.AddScoped<RetentionService>();
 
 var app = builder.Build();
@@ -167,14 +183,12 @@ Log.Information("Medical Device Monitor Backend starting on {Time}", DateTime.No
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "MedMonitor v2"));
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "MedMonitor v2.1"));
 }
 
-// ─── Health Check Endpoints ─────────────────────────────────────────────────
-// Liveness — GitHub Actions keepalive should point here instead of /api/devices
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
-    Predicate = _ => false, // Only checks that the app is alive (no DB query)
+    Predicate = _ => false,
     ResponseWriter = async (ctx, _) =>
     {
         ctx.Response.ContentType = "application/json";
@@ -182,32 +196,21 @@ app.MapHealthChecks("/health", new HealthCheckOptions
     }
 });
 
-// Readiness — includes DB probe
 app.MapHealthChecks("/health/db", new HealthCheckOptions
 {
     Predicate = hc => hc.Tags.Contains("db"),
     ResponseWriter = async (ctx, report) =>
     {
         ctx.Response.ContentType = "application/json";
-        var result = new
-        {
-            status = report.Status.ToString(),
-            checks = report.Entries.Select(e => new
-            {
-                name = e.Key,
-                status = e.Value.Status.ToString(),
-                description = e.Value.Description
-            })
-        };
+        var result = new { status = report.Status.ToString(), checks = report.Entries.Select(e => new { name = e.Key, status = e.Value.Status.ToString() }) };
         await ctx.Response.WriteAsync(JsonSerializer.Serialize(result));
     }
 });
 
-// ─── Correlation ID Middleware ──────────────────────────────────────────────
+// ─── Request Pipeline ────────────────────────────────────────────────────────
 app.Use(async (context, next) =>
 {
-    var correlationId = context.Request.Headers["X-Correlation-ID"].FirstOrDefault()
-                        ?? Guid.NewGuid().ToString();
+    var correlationId = context.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? Guid.NewGuid().ToString();
     using (LogContext.PushProperty("correlation_id", correlationId))
     {
         context.Response.Headers.Append("X-Correlation-ID", correlationId);
@@ -216,80 +219,35 @@ app.Use(async (context, next) =>
 });
 
 app.UseCors("AllowFrontend");
-
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.Use(async (context, next) =>
-{
-    var userIdString = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-    var userRole     = context.User?.FindFirst(ClaimTypes.Role)?.Value;
-    var deptIdString = context.User?.FindFirst("DepartmentId")?.Value; // Extract Department
-    
-    // Detect system-level requests (like the Python Simulator hitting the Ingest API)
-    bool isSystemIngest = false;
-    
-    if (string.IsNullOrEmpty(userIdString) && context.Request.Path.StartsWithSegments("/api/readings/ingest", StringComparison.OrdinalIgnoreCase))
-    {
-        isSystemIngest = true;
-    }
-
-    var db = context.RequestServices.GetRequiredService<AppDbContext>();
-
-    // 1. EXPLICITLY OPEN THE CONNECTION
-    await db.Database.OpenConnectionAsync();
-
-    try
-    {
-        if (!string.IsNullOrEmpty(userIdString))
-        {
-            // Inject all 3 RLS boundary variables into the Postgres Session
-            await db.Database.ExecuteSqlRawAsync(
-                "SELECT set_config('app.current_user_id', {0}, false), " +
-                "       set_config('app.user_role', {1}, false), " +
-                "       set_config('app.user_dept_id', {2}, false)",
-                userIdString, userRole ?? "", deptIdString ?? ""
-            );
-        }
-        else if (isSystemIngest)
-        {
-            // System processes bypass RLS (used strictly for edge data ingestion)
-            await db.Database.ExecuteSqlRawAsync("SELECT set_config('app.user_role', 'system', false)");
-        }
-
-        await next();
-    }
-    finally
-    {
-        // PREVENT ADO.NET CONNECTION POOL POISONING
-        // Clears ALL session variables before the connection is returned to the pool
-        await db.Database.ExecuteSqlRawAsync(
-            "SELECT set_config('app.current_user_id', '', false), " +
-            "       set_config('app.user_role', '', false), " +
-            "       set_config('app.user_dept_id', '', false)"
-        );
-
-        // 2. EXPLICITLY CLOSE THE CONNECTION
-        await db.Database.CloseConnectionAsync();
-    }
-});
 
 app.MapControllers();
 app.MapHub<VitalSignsHub>("/hubs/vitalsigns");
 
 using (var scope = app.Services.CreateScope())
 {
-    var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
-    recurringJobManager.AddOrUpdate<RetentionService>(
-        "purge-old-readings",
-        svc => svc.PurgeOldReadingsAsync(),
-        "0 2 * * *");
-
-    // Check for missed meds every 15 minutes
-    recurringJobManager.AddOrUpdate<MedicationService>(
-        "check-missed-meds",
-        svc => svc.CheckOverdueMedicationsAsync(),
-        "*/15 * * * *");
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+        recurringJobManager.AddOrUpdate<RetentionService>(
+            "purge-old-readings", 
+            svc => svc.PurgeOldReadingsAsync(), 
+            "0 2 * * *");
+        recurringJobManager.AddOrUpdate<MedicationService>(
+            "check-missed-meds", 
+            svc => svc.CheckOverdueMedicationsAsync(), 
+            "*/15 * * * *");
+        logger.LogInformation("Hangfire recurring jobs registered successfully.");
+    }
+    catch (Exception ex)
+    {
+        // Log but don't crash — Hangfire will re-register jobs on next server heartbeat
+        logger.LogWarning(ex, 
+            "Hangfire job registration failed at startup (Supabase may be waking up). " +
+            "Jobs will self-register on next Hangfire server heartbeat.");
+    }
 }
 
 app.Run();

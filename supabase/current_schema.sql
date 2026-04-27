@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS devices (
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     department_id UUID REFERENCES departments(id) ON DELETE SET NULL   -- new RBAC link
+    certificate_thumbprint VARCHAR(64);
 );
 
 -- ============================================================
@@ -261,6 +262,7 @@ CREATE INDEX IF NOT EXISTS idx_sensor_readings_time      ON sensor_readings (dev
 CREATE INDEX IF NOT EXISTS idx_audit_log_hash            ON audit_log (hash);
 CREATE INDEX IF NOT EXISTS idx_device_hierarchy          ON devices (site, department, room);
 CREATE INDEX IF NOT EXISTS idx_device_labels             ON devices USING GIN (labels);
+CREATE INDEX IF NOT EXISTS idx_devices_thumbprint        ON devices (certificate_thumbprint);
 CREATE INDEX IF NOT EXISTS idx_calibration_device        ON calibration_records (device_id);
 CREATE INDEX IF NOT EXISTS idx_meds_patient              ON medication_schedules (patient_id);
 CREATE INDEX IF NOT EXISTS idx_notes_patient             ON clinical_notes (patient_id);
@@ -407,7 +409,8 @@ ON CONFLICT (email) DO NOTHING;
 INSERT INTO devices (device_code, description, site, department, room, api_key_hash, department_id) VALUES
     ('ICU-BED-01', 'Patient Monitor — ICU Bed 1', 'General Hospital', 'ICU', 'Room 412', 'xxx', (SELECT id FROM departments WHERE name = 'ICU')),
     ('ICU-BED-02', 'Patient Monitor — ICU Bed 2', 'General Hospital', 'ICU', 'Room 412', 'xxx', (SELECT id FROM departments WHERE name = 'ICU')),
-    ('ICU-BED-03', 'Patient Monitor — ICU Bed 3', 'General Hospital', 'ICU', 'Room 412', 'xxx', (SELECT id FROM departments WHERE name = 'ICU'))
+    ('ICU-BED-03', 'Patient Monitor — ICU Bed 3', 'General Hospital', 'ICU', 'Room 412', 'xxx', (SELECT id FROM departments WHERE name = 'ICU')),
+    ('ICU-BED-04', 'Patient Monitor — ICU Bed 4', 'General Hospital', 'ICU', 'Room 412', 'xxx', (SELECT id FROM departments WHERE name = 'ICU'))
 ON CONFLICT (device_code) DO NOTHING;
 
--- *Updated to 20260503000000_update_func.sql
+-- *Updated to 20260504000000_mutual_TLS_hardware_authentication.sql

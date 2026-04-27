@@ -39,17 +39,31 @@ public class ReadingService
     public async Task ProcessNewReadingAsync(IngestReadingDto dto, string apiKey)
     {
         var device = await _db.Devices.FirstOrDefaultAsync(d => d.DeviceCode == dto.DeviceCode);
-        
         if (device == null)
         {
             _logger.LogWarning("Abnormal Event: Received data for unknown device {DeviceCode}", dto.DeviceCode);
             throw new Exception($"Device {dto.DeviceCode} not found.");
         }
 
-        // --- DEVICE AUTHENTICATION ---
-        if (string.IsNullOrEmpty(device.ApiKeyHash) || !BCrypt.Net.BCrypt.Verify(apiKey, device.ApiKeyHash))
+        // --- ENHANCED DEVICE AUTHENTICATION (Sprint 5.2) ---
+        // 1. Try mTLS (Hardware Certificate) first
+        // Note: Nginx/Reverse Proxy extracts the thumbprint and passes it in a header
+        var certThumbprint = apiKey; // In mTLS mode, we pass the thumbprint in this field for simplicity in the gateway
+        
+        bool isAuthenticated = false;
+
+        if (!string.IsNullOrEmpty(device.CertificateThumbprint) && device.CertificateThumbprint == certThumbprint)
         {
-            throw new UnauthorizedAccessException($"Invalid API Key for device {dto.DeviceCode}");
+            isAuthenticated = true; // Hardware-level trust
+        }
+        else if (!string.IsNullOrEmpty(device.ApiKeyHash) && BCrypt.Net.BCrypt.Verify(apiKey, device.ApiKeyHash))
+        {
+            isAuthenticated = true; // Legacy Key trust
+        }
+
+        if (!isAuthenticated)
+        {
+            throw new UnauthorizedAccessException($"Hardware/Key verification failed for device {dto.DeviceCode}");
         }
         
         // 1. Get last reading (for Rate-of-Change alerts)
@@ -142,6 +156,14 @@ public class ReadingService
             }
         }
 
+        // ── Rule E: MEWS Composite Score ──────────────────────────────────
+        int mewsScore = CalculateMews(dto.Payload);
+        if (mewsScore >= 4 && !recentAlertTypes.Contains("HIGH_MEWS_SCORE"))
+        {
+            activeAlertsToSave.Add(CreateAlert(device.Id, reading, "HIGH_MEWS_SCORE", "CRITICAL",
+                $"Patient Deterioration Warning (MEWS = {mewsScore}). Immediate clinical review required."));
+        }
+
         if (activeAlertsToSave.Any())
             _db.Alerts.AddRange(activeAlertsToSave);
 
@@ -230,5 +252,41 @@ public class ReadingService
             r.RecordedAt,
             Payload = r.Payload
         });
+    }
+
+    private int CalculateMews(JsonElement payload)
+    {
+        int score = 0;
+
+        // 1. Heart Rate (bpm)
+        if (payload.TryGetProperty("heart_rate", out var hrProp) && hrProp.TryGetDouble(out var hr))
+        {
+            if (hr <= 40 || hr >= 130) score += 2;
+            else if (hr <= 50 || (hr >= 111 && hr <= 129)) score += 1;
+        }
+
+        // 2. Respiratory Rate (respiration)
+        if (payload.TryGetProperty("respiration", out var rrProp) && rrProp.TryGetDouble(out var rr))
+        {
+            if (rr < 9 || rr > 29) score += 2;
+            else if (rr >= 21 && rr <= 29) score += 2; 
+        }
+
+        // 3. Systolic BP (systolic_bp)
+        if (payload.TryGetProperty("systolic_bp", out var sbpProp) && sbpProp.TryGetDouble(out var sbp))
+        {
+            if (sbp <= 70) score += 3;
+            else if (sbp <= 80) score += 2;
+            else if (sbp <= 100) score += 1;
+            else if (sbp >= 200) score += 2;
+        }
+
+        // 4. Temperature (temperature)
+        if (payload.TryGetProperty("temperature", out var tProp) && tProp.TryGetDouble(out var temp))
+        {
+            if (temp < 35.0 || temp >= 38.5) score += 2;
+        }
+
+        return score;
     }
 }
