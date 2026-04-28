@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useVitals } from './hooks/useVitals';
 import Login from './Login';
+import SystemSettings from './SystemSettings'; 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Activity, Heart, Thermometer, AlertTriangle, CheckCircle2, Bed,
@@ -14,7 +15,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
 // ─── NAV CONFIG ────────────────────────────────────────────────────────────────
 // Add new top-level views here for scalability
-const NAV_ITEMS = [
+const NAV_ITEMS =[
   {
     id: 'monitoring',
     label: 'Patient Monitoring',
@@ -29,10 +30,10 @@ const NAV_ITEMS = [
   },
   {
     id: 'settings',
-    label: 'System Parameters',
+    label: 'System & Audit Logs', // UPDATED LABEL
     icon: Settings,
     roles: ['admin'],
-    badge: 'Soon',
+    // REMOVED `badge: 'Soon'`
   },
 ];
 
@@ -133,7 +134,7 @@ export default function App() {
             : <MonitoringLanding />
         )}
         {currentView === 'access' && <AccessManagement />}
-        {currentView === 'settings' && <SystemParametersPlaceholder />}
+        {currentView === 'settings' && <SystemSettings backendUrl={BACKEND_URL} />}
       </main>
     </div>
   );

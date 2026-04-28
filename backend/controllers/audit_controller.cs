@@ -1,7 +1,10 @@
 using MedicalDeviceMonitor.Services;
 using MedicalDeviceMonitor.Authorization;
+using MedicalDeviceMonitor.Data; 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Linq; 
 
 namespace MedicalDeviceMonitor.Controllers;
 
@@ -11,10 +14,35 @@ namespace MedicalDeviceMonitor.Controllers;
 public class AuditController : ControllerBase
 {
     private readonly AuditService _auditService;
+    private readonly AppDbContext _db; // ADDED
 
-    public AuditController(AuditService auditService)
+    // UPDATE CONSTRUCTOR
+    public AuditController(AuditService auditService, AppDbContext db)
     {
         _auditService = auditService;
+        _db = db;
+    }
+
+    // ADD THIS NEW ENDPOINT
+    [HttpGet]
+    [RequirePermission("audit:view")]
+    public async Task<IActionResult> GetLogs([FromQuery] int limit = 50)
+    {
+        var logs = await _db.AuditLogs
+            .OrderByDescending(a => a.Id)
+            .Take(limit)
+            .Select(a => new {
+                a.Id,
+                a.UserId,
+                a.Action,
+                a.EntityType,
+                a.EntityId,
+                a.OccurredAt,
+                a.Hash
+            })
+            .ToListAsync();
+            
+        return Ok(logs);
     }
 
     [HttpGet("verify")]
