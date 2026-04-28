@@ -20,4 +20,6 @@ public class Role
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public virtual ICollection<Permission> Permissions { get; set; } = new List<Permission>();
 }
