@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization; 
 
 namespace MedicalDeviceMonitor.Models;
 
@@ -17,4 +18,7 @@ public class Permission
 
     [Column("description")]
     public string? Description { get; set; }
+
+    [JsonIgnore]
+    public virtual ICollection<Role> Roles { get; set; } = new List<Role>();
 }

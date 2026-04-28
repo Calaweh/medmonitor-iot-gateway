@@ -37,5 +37,14 @@ public class AppDbContext : DbContext
         // Ensure decimal precision for vitals if needed
         modelBuilder.Entity<PatientThreshold>().Property(p => p.MinValue).HasColumnType("decimal");
         modelBuilder.Entity<PatientThreshold>().Property(p => p.MaxValue).HasColumnType("decimal");
+
+        modelBuilder.Entity<Role>()
+            .HasMany(r => r.Permissions)
+            .WithMany(p => p.Roles)
+            .UsingEntity<Dictionary<string, object>>(
+                "role_permissions", // Must match your SQL table name exactly
+                j => j.HasOne<Permission>().WithMany().HasForeignKey("permission_id"),
+                j => j.HasOne<Role>().WithMany().HasForeignKey("role_id")
+            );
     }
 }

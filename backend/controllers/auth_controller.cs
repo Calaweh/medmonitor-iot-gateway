@@ -1,4 +1,5 @@
 using MedicalDeviceMonitor.Data;
+using MedicalDeviceMonitor.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -163,5 +164,23 @@ public class AuthController : ControllerBase
     public class PermissionResult
     {
         public string Value { get; set; } = "";
+    }
+
+    [Authorize]
+    [HttpGet("users")]
+    [RequirePermission("users:manage")] 
+    public async Task<IActionResult> GetAllUsers()
+    {
+        var users = await _db.Users
+            .Select(u => new { 
+                u.Id, 
+                u.FullName, 
+                u.Email, 
+                u.Role, 
+                u.IsActive 
+            })
+            .ToListAsync();
+
+        return Ok(users);
     }
 }
