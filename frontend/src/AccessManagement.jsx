@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Shield, Users, FolderTree, UserPlus, Lock, Check, 
-  Plus, Trash2, Edit2, Search, Building2, Bell 
+  Plus, Trash2, Edit2, Search, Building2
 } from 'lucide-react';
 
 export default function AccessManagement() {
