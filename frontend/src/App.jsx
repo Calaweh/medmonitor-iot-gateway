@@ -8,7 +8,7 @@ import {
   Activity, Heart, Thermometer, AlertTriangle, CheckCircle2, Bed,
   Building2, LogOut, Lock, Shield, Users, Edit2, Plus, ChevronRight,
   ChevronDown, Settings, BarChart2, Layers, Trash2, Search,
-  UserPlus, FolderTree, Check, X, Monitor, MapPin, Hash
+  UserPlus, FolderTree, X, Monitor, MapPin, Hash
 } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
