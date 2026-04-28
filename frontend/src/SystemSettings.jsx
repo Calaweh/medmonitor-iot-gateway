@@ -4,7 +4,7 @@ import axios from 'axios';
 import { 
   Settings, ShieldCheck, Save, Database, FileText, 
   Lock, CheckCircle2, AlertTriangle, Activity, 
-  Thermometer, Clock, RefreshCw 
+  Clock, RefreshCw 
 } from 'lucide-react';
 
 export default function SystemSettings({ backendUrl }) {
