@@ -8,7 +8,7 @@ export default function AccessManagement() {
   const [activeTab, setActiveTab] = useState('users'); // users | roles | groups
   
   // --- MOCK DATA (Connect this to your API endpoints in the next step) ---
-  const [users, setUsers] = useState([
+  const [users] = useState([
     { id: '1', name: 'Dr. Sarah Lim', email: 'sarah.lim@medmonitor.local', role: 'Doctor', dept: 'ICU', status: 'Active' },
     { id: '2', name: 'Nurse John Doe', email: 'john.doe@medmonitor.local', role: 'Nurse', dept: 'ICU', status: 'Active' },
     { id: '3', name: 'Sys Admin', email: 'admin@medmonitor.local', role: 'Admin', dept: 'All', status: 'Active' },
