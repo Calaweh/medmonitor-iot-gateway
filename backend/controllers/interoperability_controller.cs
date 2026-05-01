@@ -145,15 +145,11 @@ public class InteroperabilityController : ControllerBase
                 else if (fields[0] == "OBX")
                 {
                     // Format Example: OBX|1|NM|8867-4^Heart Rate^LN||85|bpm|...
-                    if (fields.Length > 5)
+                    if (fields.Length > 5 &&
+                        LoincMap.TryGetValue(fields[3].Split('^')[0], out var internalKey) &&
+                        double.TryParse(fields[5], out var val))
                     {
-                        var obsIdentifier = fields[3].Split('^')[0]; // Isolate LOINC code
-                        var obsValueStr = fields[5];
-
-                        if (LoincMap.TryGetValue(obsIdentifier, out var internalKey) && double.TryParse(obsValueStr, out var val))
-                        {
-                            payloadNode.Add(internalKey, val);
-                        }
+                        payloadNode.Add(internalKey, val);
                     }
                 }
             }
