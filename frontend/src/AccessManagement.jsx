@@ -14,7 +14,7 @@ export default function AccessManagement() {
     { id: '3', name: 'Sys Admin', email: 'admin@medmonitor.local', role: 'Admin', dept: 'All', status: 'Active' },
   ]);
 
-  const [roles, setRoles] = useState([
+  const [roles] = useState([
     { id: 'r1', name: 'Nurse', description: 'Clinical staff for monitoring and resolution', perms: ['alerts:view', 'alerts:resolve', 'reports:download'] },
     { id: 'r2', name: 'Doctor', description: 'Medical officers with full clinical authority', perms: ['alerts:view', 'alerts:resolve', 'patients:view', 'patients:admit', 'patients:threshold', 'reports:download'] },
     { id: 'r3', name: 'Admin', description: 'System administrators with full access', perms: ['alerts:view', 'patients:view', 'audit:view', 'users:manage', 'rbac:manage'] },
