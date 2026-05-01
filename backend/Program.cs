@@ -175,6 +175,7 @@ builder.Services.AddHangfireServer(options =>
     options.CancellationCheckInterval = TimeSpan.FromMinutes(2);
 });
 builder.Services.AddScoped<RetentionService>();
+builder.Services.AddScoped<AlertEscalationService>();
 
 var app = builder.Build();
 
@@ -239,6 +240,10 @@ using (var scope = app.Services.CreateScope())
             "check-missed-meds", 
             svc => svc.CheckOverdueMedicationsAsync(), 
             "*/15 * * * *");
+        recurringJobManager.AddOrUpdate<AlertEscalationService>(
+            "escalate-unresolved-alerts", 
+            svc => svc.EscalateAlertsAsync(), 
+            "*/5 * * * *"); // Run every 5 minutes
         logger.LogInformation("Hangfire recurring jobs registered successfully.");
     }
     catch (Exception ex)

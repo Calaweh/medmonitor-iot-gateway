@@ -18,5 +18,6 @@ public class CalibrationRecord
     
     [Column("passed")] public bool Passed { get; set; }
     
-    public Device? Device { get; set; }
+    [ForeignKey("DeviceId")]
+    public virtual Device? Device { get; set; }
 }

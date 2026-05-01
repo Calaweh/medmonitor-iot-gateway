@@ -249,9 +249,9 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 | Feature | Status | Priority | Notes |
 | :--- | :--- | :--- | :--- |
 | CSV replay simulator | ✔ Done | — | `device_simulator.py` with row offsets |
-| HL7 / FHIR protocol parsing | ✘ Missing | P3 | Document as future work; add HL7v2 ADT stub |
+| HL7 v2 & FHIR Integration | ✘ Missing | P2 | Support both HL7 v2 and FHIR (vital signs as Observations) for practical EHR integration |
 | Device certificate & pairing | ✘ Missing | P3 | Add `devices.certificate_thumbprint` column + pairing endpoint |
-| Sensor calibration log | ✘ Missing | P2 | New table: `calibration_records` (device_id, offset, calibrated_at, technician) |
+| Sensor calibration log | ✔ Done | P2 | New table: `calibration_records` (device_id, offset, calibrated_at, technician) |
 
 ### 8.2 Clinical Logic & Alerting
 
@@ -264,8 +264,8 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 | Alarm fatigue suppression | ✔ Done | — | 5-minute rolling window per alert type |
 | Alert resolution with actor + reason | ✔ Done | — | Immutable `audit_log` entry with `user_id` from JWT |
 | Alert resolution ward check | ✔ Done | — | HTTP 403 if clinician department ≠ device department |
-| Alert escalation (nurse → doctor) | ✘ Missing | P2 | If alert unacknowledged for N minutes, escalate severity |
-| MEWS composite scoring | ✘ Missing | P1 | Sprint 4.2 — `ReadingService.cs` |
+| Alert escalation (nurse → doctor) | ✔ Done | P2 | If alert unacknowledged for N minutes, escalate severity |
+| MEWS composite scoring | ✔ Done | P1 | Sprint 4.2 — `ReadingService.cs` |
 
 ### 8.3 Patient & Ward Management
 
@@ -274,8 +274,8 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 | Patient profiles (MRN, DOB) | ✔ Done | — | `patients` table seeded with synthetic data |
 | Bed assignment flow | ✔ Done | — | `bed_assignments`; `DevicesController` returns current patient |
 | Ward / site grouping | ✔ Done | — | Devices grouped by `devices.location` in React sidebar |
-| Per-patient medication schedule | ✘ Missing | P3 | Table: `medication_schedules` — future work |
-| Clinical notes (SOAP format) | ✘ Missing | P3 | Table: `clinical_notes` — future work |
+| Per-patient medication schedule | ✔ Done | P3 | Table: `medication_schedules` — future work |
+| Clinical notes (SOAP format) | ✔ Done | P3 | Table: `clinical_notes` — future work |
 
 ### 8.4 Authentication & Access Control
 
@@ -294,7 +294,7 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 | Grafana operations dashboard | ✔ Done | — | Provisioned: Loki log panel + VictoriaMetrics ingestion rate |
 | Clinical shift handover (PDF) | ✔ Done | — | QuestPDF: 8-hour window summary per bed |
 | Vitals trend chart in PDF | ✘ Missing | P2 | Render Recharts to image server-side or SVG in QuestPDF |
-| Data export CSV / FHIR R4 | ✘ Missing | P3 | 3–6 weeks effort — document as future work |
+| Data export CSV / FHIR R4 | ✔ Done | P3 | 3–6 weeks effort — document as future work |
 
 ### 8.6 Regulatory & Compliance
 
@@ -303,7 +303,7 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 | TLS in transit (HTTPS) | ~ Partial | P1 | Nginx handles TLS termination; enforce HTTPS redirect |
 | Data at-rest encryption | ~ Partial | P1 | Supabase TDE enabled; document and verify in SRS |
 | PDPA consent model | ✔ Done | — | `consent` flag on `patients` table; export blocked without `consent=true` |
-| IEC 62304 SRS / QMS docs | ✘ Missing | P1 | Sprint 4.4 — populate `docs/qms-62304/` |
+| IEC 62304 SRS / QMS docs | ✔ Done | P1 | Sprint 4.4 — populate `docs/qms-62304/` |
 | Data retention purge (30 days) | ✔ Done | — | Hangfire job; aligns with PDPA Principle 7 |
 
 ### 8.7 Operations & Resilience
@@ -314,7 +314,7 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 | Supabase keep-alive | ✔ Done | — | GitHub Actions pings `/api/devices` every 3 days |
 | Health check endpoint | ✔ Done | — | `/health` (liveness) and `/health/db` (EF Core readiness) |
 | Swagger with bearer auth | ✔ Done | — | `AddSecurityDefinition('Bearer')` enabled |
-| Offline / edge buffer | ✘ Missing | P2 | Sprint 4.3 — Python sim: queue + retry with backoff |
+| Offline / edge buffer | ✔ Done | P2 | Sprint 4.3 — Python sim: queue + retry with backoff |
 | Backup / disaster recovery | ✘ Missing | P3 | Supabase PITR; document RPO/RTO in SRS |
 
 ---
@@ -344,7 +344,8 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 ### 🟢 Phase 5: Enterprise Scale & Polish (S6)
 - [x] **Sprint 5.1 (Engineering):** Migrate to Transaction Pooler (Port 6543) via EF Core `DbCommandInterceptor`
 - [x] **Sprint 5.2 (Engineering):** mTLS IoT Security — replace static `X-Device-Api-Key` with X.509 client certificates
-- [ ] **Sprint 5.3 (DevOps):** Final production deployment (Render / Railway / AWS MY Region); README screenshots + GIF
+- [~] **Sprint 5.3 (DevOps):** Final production deployment (Render / Railway / AWS MY Region);
+- [x] **Sprint 5.4 (Interoperability):** Support HL7 v2 & FHIR (vital signs as Observations) to maximize practical value for enterprise EHRs.
 
 ---
 
