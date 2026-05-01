@@ -95,9 +95,14 @@ public class InteroperabilityController : ControllerBase
             
             return Ok(new { message = "FHIR Observation successfully mapped and ingested." });
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogError(ex, "Error processing FHIR Observation.");
+            _logger.LogError(ex, "Invalid FHIR Observation JSON payload.");
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogError(ex, "Invalid FHIR Observation field format.");
             return BadRequest(new { error = ex.Message });
         }
     }
