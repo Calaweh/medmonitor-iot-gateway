@@ -5,6 +5,7 @@ import json
 import random
 import requests
 import threading
+import collections
 from datetime import datetime, timezone
 from pathlib import Path
 import uuid
@@ -75,11 +76,11 @@ def check_alert(payload: dict) -> str | None:
 def simulate_device(device_code: str, row_offset: int):
     """ Runs in a separate thread for each device """
     print(f"[{device_code}] Thread started. Offset: {row_offset}")
-    
-    # Introduce a slight random start delay so they don't hit the API at the exact same millisecond
     time.sleep(random.uniform(0, 1.5))
-    
     source = stream_csv(CSV_PATH, row_offset)
+    
+    # EDGE BUFFERING: Queue for disconnected operations
+    buffer = collections.deque(maxlen=10000) # Prevents memory exhaustion
     
     for payload in source:
         correlation_id = str(uuid.uuid4())
@@ -90,26 +91,42 @@ def simulate_device(device_code: str, row_offset: int):
         }
         headers = {
             "X-Correlation-ID": correlation_id,
-            "X-Device-Api-Key": os.getenv("DEVICE_API_KEY", "DeviceSecret123!")
+            "X-Device-Api-Key": os.getenv("DEVICE_API_KEY", "Admin123!")
         }
-        
+
         alert = check_alert(payload)
         if alert:
             print(f"[{device_code}] ⚠️  ALERT: {alert}")
             push_to_loki(device_code, "WARN", f"Alert: {alert}", "abnormal", correlation_id)
 
+        # 1. Attempt to flush buffer first if network is restored
+        flush_success = True
+        while buffer and flush_success:
+            buffered_req = buffer[0]
+            try:
+                resp = requests.post(INGEST_ENDPOINT, json=buffered_req['body'], headers=buffered_req['headers'], timeout=3)
+                if resp.status_code in (200, 201):
+                    buffer.popleft()
+                    print(f"[{device_code}] 🔄 Flushed buffered reading ({len(buffer)} remaining)")
+                else:
+                    flush_success = False # Backend rejected it (e.g. 500 or 401), stop flushing
+            except requests.exceptions.RequestException:
+                flush_success = False # Network still down
+
+        # 2. Process current reading
         try:
-            resp = requests.post(INGEST_ENDPOINT, json=body, headers=headers, timeout=10)
+            resp = requests.post(INGEST_ENDPOINT, json=body, headers=headers, timeout=5)
             if resp.status_code in (200, 201):
                 print(f"[{device_code}] ✅ HR={payload.get('heart_rate')} SpO2={payload.get('spo2')}")
-                # Log success to Loki so we see activity in Grafana
                 push_to_loki(device_code, "INFO", f"Ingested HR={payload.get('heart_rate')}", "normal", correlation_id)
             else:
                 print(f"[{device_code}] ❌ Backend Error: {resp.status_code} — {resp.text}")
                 push_to_loki(device_code, "ERROR", f"HTTP {resp.status_code}", "abnormal", correlation_id)
+                buffer.append({'body': body, 'headers': headers})
         except requests.exceptions.RequestException as e:
-            print(f"[{device_code}] ❌ Connection Error: {e}")
+            print(f"[{device_code}] ❌ Connection Error — Buffering payload (Buffer size: {len(buffer) + 1})")
             push_to_loki(device_code, "ERROR", f"Connection Error: {e}", "abnormal", correlation_id)
+            buffer.append({'body': body, 'headers': headers})
             
         time.sleep(REPLAY_SPEED)
 

@@ -1,20 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Shield, Users, FolderTree, UserPlus, Lock, Check, 
-  Plus, Trash2, Edit2, Search, Building2
+  Plus, Trash2, Edit2, Search, Building2, Bell 
 } from 'lucide-react';
 
 export default function AccessManagement() {
   const [activeTab, setActiveTab] = useState('users'); // users | roles | groups
   
   // --- MOCK DATA (Connect this to your API endpoints in the next step) ---
-  const [users] = useState([
+  const [users, setUsers] = useState([
     { id: '1', name: 'Dr. Sarah Lim', email: 'sarah.lim@medmonitor.local', role: 'Doctor', dept: 'ICU', status: 'Active' },
     { id: '2', name: 'Nurse John Doe', email: 'john.doe@medmonitor.local', role: 'Nurse', dept: 'ICU', status: 'Active' },
     { id: '3', name: 'Sys Admin', email: 'admin@medmonitor.local', role: 'Admin', dept: 'All', status: 'Active' },
   ]);
 
-  const [roles] = useState([
+  const [roles, setRoles] = useState([
     { id: 'r1', name: 'Nurse', description: 'Clinical staff for monitoring and resolution', perms: ['alerts:view', 'alerts:resolve', 'reports:download'] },
     { id: 'r2', name: 'Doctor', description: 'Medical officers with full clinical authority', perms: ['alerts:view', 'alerts:resolve', 'patients:view', 'patients:admit', 'patients:threshold', 'reports:download'] },
     { id: 'r3', name: 'Admin', description: 'System administrators with full access', perms: ['alerts:view', 'patients:view', 'audit:view', 'users:manage', 'rbac:manage'] },

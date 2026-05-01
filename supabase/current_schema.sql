@@ -1,6 +1,7 @@
 -- =============================================================================
--- FINAL DATABASE SCHEMA (after all migrations up to 20260503000000)
--- Includes: devices + department RBAC, clinical tables, audit hash chain, RLS
+-- FINAL DATABASE SCHEMA (after all migrations up to 20260504000000)
+-- Includes: devices + department RBAC, clinical tables, audit hash chain,
+--           strict access control, audit immutability, and mutual TLS support
 -- =============================================================================
 
 -- ============================================================
@@ -35,8 +36,8 @@ CREATE TABLE IF NOT EXISTS devices (
     api_key_hash  VARCHAR(255),
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    department_id UUID REFERENCES departments(id) ON DELETE SET NULL   -- new RBAC link
-    certificate_thumbprint VARCHAR(64);
+    department_id UUID REFERENCES departments(id) ON DELETE SET NULL,   -- new RBAC link
+    certificate_thumbprint VARCHAR(64)
 );
 
 -- ============================================================
@@ -413,4 +414,55 @@ INSERT INTO devices (device_code, description, site, department, room, api_key_h
     ('ICU-BED-04', 'Patient Monitor — ICU Bed 4', 'General Hospital', 'ICU', 'Room 412', 'xxx', (SELECT id FROM departments WHERE name = 'ICU'))
 ON CONFLICT (device_code) DO NOTHING;
 
--- *Updated to 20260504000000_mutual_TLS_hardware_authentication.sql
+-- ============================================================
+-- 19. STRICT DATABASE ACCESS CONTROL (Least Privilege)
+-- ============================================================
+
+-- Create dedicated backend application role (if not exists)
+DO
+$$
+BEGIN
+   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'medmon_api') THEN
+      CREATE ROLE medmon_api WITH LOGIN PASSWORD 'ReplaceWithStrongApiPassword123!';
+   END IF;
+END
+$$;
+
+-- Revoke default public access to the public schema
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
+
+-- Grant schema usage to our dedicated role
+GRANT USAGE ON SCHEMA public TO medmon_api;
+
+-- Grant standard CRUD permissions to the API role for all existing tables
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO medmon_api;
+
+-- Revoke destructive permissions on append‑only tables
+REVOKE UPDATE, DELETE ON audit_log FROM medmon_api;
+REVOKE UPDATE, DELETE ON sensor_readings FROM medmon_api;   -- Only RetentionService may delete
+
+-- Grant sequence access for auto‑increment (BIGSERIAL)
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO medmon_api;
+
+-- Ensure future tables automatically grant access to medmon_api
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO medmon_api;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO medmon_api;
+
+-- ============================================================
+-- 20. AUDIT LOG IMMUTABILITY (Database‑Level Trigger)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION prevent_audit_tampering()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'CRITICAL: Audit log entries are immutable (HSA CLS-MD Level 2). UPDATE and DELETE operations are strictly forbidden at the database layer.';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS enforce_append_only_audit ON audit_log;
+CREATE TRIGGER enforce_append_only_audit
+BEFORE UPDATE OR DELETE ON audit_log
+FOR EACH ROW EXECUTE FUNCTION prevent_audit_tampering();
+
+-- *Updated to 20260428182600_strict_db_access_control.sql

@@ -73,4 +73,5 @@ docs/architecture_explanation.md
 *.bak
 repomix-output.xml
 repomix.config.json
+repomix-instruction.md
 .claude

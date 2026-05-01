@@ -176,7 +176,8 @@ public class ReadingService
             reading.DeviceId,
             device.DeviceCode,
             reading.RecordedAt,
-            Payload = dto.Payload
+            Payload = dto.Payload,
+            MewsScore = mewsScore
         });
 
         foreach (var alert in activeAlertsToSave)
@@ -258,35 +259,37 @@ public class ReadingService
     {
         int score = 0;
 
-        // 1. Heart Rate (bpm)
-        if (payload.TryGetProperty("heart_rate", out var hrProp) && hrProp.TryGetDouble(out var hr))
-        {
-            if (hr <= 40 || hr >= 130) score += 2;
-            else if (hr <= 50 || (hr >= 111 && hr <= 129)) score += 1;
-        }
-
-        // 2. Respiratory Rate (respiration)
+        // 1. Respiratory Rate (Most sensitive indicator of deterioration)
         if (payload.TryGetProperty("respiration", out var rrProp) && rrProp.TryGetDouble(out var rr))
         {
-            if (rr < 9 || rr > 29) score += 2;
-            else if (rr >= 21 && rr <= 29) score += 2; 
+            if (rr < 9 || rr > 30) score += 3;
+            else if (rr >= 21 && rr <= 29) score += 2;
+            else if (rr >= 15 && rr <= 20) score += 1;
         }
 
-        // 3. Systolic BP (systolic_bp)
+        // 2. Heart Rate
+        if (payload.TryGetProperty("heart_rate", out var hrProp) && hrProp.TryGetDouble(out var hr))
+        {
+            if (hr < 40 || hr > 130) score += 3;
+            else if (hr >= 111 && hr <= 129) score += 2;
+            else if (hr >= 101 && hr <= 110 || hr >= 41 && hr <= 50) score += 1;
+        }
+
+        // 3. Systolic BP
         if (payload.TryGetProperty("systolic_bp", out var sbpProp) && sbpProp.TryGetDouble(out var sbp))
         {
-            if (sbp <= 70) score += 3;
-            else if (sbp <= 80) score += 2;
-            else if (sbp <= 100) score += 1;
-            else if (sbp >= 200) score += 2;
+            if (sbp <= 70 || sbp >= 200) score += 3;
+            else if (sbp >= 71 && sbp <= 80) score += 2;
+            else if (sbp >= 81 && sbp <= 100) score += 1;
         }
 
-        // 4. Temperature (temperature)
+        // 4. Temperature
         if (payload.TryGetProperty("temperature", out var tProp) && tProp.TryGetDouble(out var temp))
         {
-            if (temp < 35.0 || temp >= 38.5) score += 2;
+            if (temp < 35.0) score += 2;
+            else if (temp >= 38.5) score += 2;
         }
 
         return score;
-    }
+    }   
 }

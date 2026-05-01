@@ -4,7 +4,7 @@ import axios from 'axios';
 import { 
   Settings, ShieldCheck, Save, Database, FileText, 
   Lock, CheckCircle2, AlertTriangle, Activity, 
-  Clock, RefreshCw 
+  Thermometer, Clock, RefreshCw, Monitor 
 } from 'lucide-react';
 
 export default function SystemSettings({ backendUrl }) {
@@ -23,14 +23,44 @@ export default function SystemSettings({ backendUrl }) {
   // Audit State
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
-  const[verifyStatus, setVerifyStatus] = useState('idle'); // idle | loading | success | error
-  const[verifyMessage, setVerifyMessage] = useState('');
+  const [verifyStatus, setVerifyStatus] = useState('idle'); // idle | loading | success | error
+  const [verifyMessage, setVerifyMessage] = useState('');
+
+  // Maintenance State
+  const [devices, setDevices] = useState([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'audit') {
       fetchLogs();
+    } else if (activeTab === 'maintenance') {
+      fetchDevices();
     }
   }, [activeTab, backendUrl]);
+
+  const fetchDevices = async () => {
+    setLoadingDevices(true);
+    try {
+      const res = await axios.get(`${backendUrl}/api/devices`);
+      setDevices(res.data);
+    } catch (err) {
+      console.error("Failed to fetch devices", err);
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  const handleCalibrate = async (deviceId) => {
+    try {
+      await axios.post(`${backendUrl}/api/devices/${deviceId}/calibrate`, {
+        notes: "Routine calibration via System Settings",
+        passed: true
+      });
+      fetchDevices(); // Refresh list to show updated calibration data
+    } catch (err) {
+      alert("Failed to log calibration. Check your permissions.");
+    }
+  };
 
   const fetchLogs = async () => {
     setLoadingLogs(true);
@@ -104,6 +134,14 @@ export default function SystemSettings({ backendUrl }) {
           }`}
         >
           <ShieldCheck size={14} /> Audit Trail
+        </button>
+        <button
+          onClick={() => setActiveTab('maintenance')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            activeTab === 'maintenance' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          <Monitor size={14} /> Device Maintenance
         </button>
       </div>
 
@@ -253,6 +291,44 @@ export default function SystemSettings({ backendUrl }) {
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'maintenance' && (
+        <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-6">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                  <Settings size={16} className="text-orange-400" /> Calibration & Safety Logs
+              </h3>
+          </div>
+          <div className="space-y-4">
+              {loadingDevices ? (
+                 <div className="p-4 text-center text-slate-500 text-sm">Fetching devices...</div>
+              ) : devices.length === 0 ? (
+                 <div className="p-4 text-center text-slate-500 text-sm">No devices available.</div>
+              ) : devices.map(d => (
+                  <div key={d.id} className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                      <div>
+                          <div className="text-sm font-bold text-white">{d.deviceCode}</div>
+                          <div className="text-xs text-slate-500 mt-1">
+                              Last Calibrated: {d.lastCalibration ? new Date(d.lastCalibration.calibratedAt).toLocaleDateString() : 'Never'}
+                              {d.lastCalibration && <span className="ml-2">by {d.lastCalibration.technician}</span>}
+                          </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                          {d.lastCalibration?.passed && (
+                              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">PASSED</span>
+                          )}
+                          {d.lastCalibration && !d.lastCalibration.passed && (
+                              <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20">FAILED</span>
+                          )}
+                          <button onClick={() => handleCalibrate(d.id)} className="text-xs text-blue-400 hover:text-blue-300 font-bold px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-colors">
+                              LOG CALIBRATION
+                          </button>
+                      </div>
+                  </div>
+              ))}
           </div>
         </div>
       )}
