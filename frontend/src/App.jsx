@@ -585,7 +585,7 @@ function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) 
   );
 }
 
-function DeviceHistory({ deviceCode, backendUrl }) {
+export function DeviceHistory({ deviceCode, backendUrl }) {
   const [activeTab, setActiveTab] = useState('admissions'); // 'admissions' | 'telemetry'
   
   // Admissions State
