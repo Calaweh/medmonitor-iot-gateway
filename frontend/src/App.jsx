@@ -346,7 +346,6 @@ function MonitoringLanding() {
 function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) { 
   const { readings, latestReading, alerts } = useVitals(BACKEND_URL, deviceCode, token);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [notes, setNotes] = useState([]);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [newNote, setNewNote] = useState({ subjective: '', objective: '', assessment: '', plan: '' });
@@ -360,10 +359,6 @@ function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) 
       setNotes([]); 
     }
   }, [patientInfo?.patientId, deviceCode]); 
-
-  useEffect(() => {
-    setShowHistory(false);
-  }, [deviceCode]);
 
   const downloadShiftReport = async () => {
     setIsGenerating(true);
