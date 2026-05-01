@@ -125,10 +125,8 @@ public class InteroperabilityController : ControllerBase
             var payloadNode = new JsonObject();
             DateTime recordedAt = DateTime.UtcNow;
 
-            foreach (var seg in segments)
+            foreach (var fields in segments.Select(seg => seg.Split('|')))
             {
-                var fields = seg.Split('|');
-                
                 // Message Header Segment
                 if (fields[0] == "MSH")
                 {
