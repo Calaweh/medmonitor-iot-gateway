@@ -14,10 +14,12 @@ MedMonitor is a software application intended to acquire, store, and display phy
 | **SRS-005** | The system shall enforce a 5-minute alarm suppression window per alert type per patient to mitigate alarm fatigue. | Integration Test |
 | **SRS-006** | Edge nodes (simulators/devices) shall buffer data locally during network dropouts and sync upon restoration. | Edge Integration Test |
 
-## 3. Security & Privacy Requirements
+## 3. Security, Privacy & Resilience Requirements
 | ID | Requirement | Verification Method |
 | :--- | :--- | :--- |
 | **SRS-007** | A clinician resolving an alert must belong to the same department (ward) as the device that raised it. | RLS DB Test |
 | **SRS-008** | The audit log shall include a cryptographic hash (HMAC-SHA256) of the previous entry to detect tampering. | Hash Validation Test |
 | **SRS-009** | The system shall automatically purge sensor readings older than 30 days to comply with PDPA Principle 7. | Background Job Log |
 | **SRS-010** | Patient data export shall require an explicit `consent=true` flag on the patient record. | API Test (403 Forbidden) |
+| **SRS-011** | Edge devices shall be securely authenticated utilizing Mutual TLS (mTLS) or an API Key backed by a BCrypt hash. | API Gateway Logs |
+| **SRS-012** | Database shall support Point-in-Time Recovery (PITR) with an RPO (Recovery Point Objective) of < 5 minutes and an RTO of < 2 hours for disaster recovery. | Cloud Console Validation |

@@ -230,12 +230,12 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 
 | Document | Purpose | Status |
 | :--- | :--- | :--- |
-| `SDP.md` | Software Development Plan — GitHub Actions, CI/CD pipeline | Phase 4 |
-| `SRS.md` | Software Requirements Spec — testable statements (see §7.2) | Phase 4 |
-| `SAD.md` | Software Architecture Document — safety segregation (backend vs UI) | Phase 4 |
-| `SOUP.md` | Software of Unknown Provenance — .NET 8, React, Hangfire, PostgreSQL risk tracking | Phase 4 |
-| `ISO14971_Risk_Matrix.md` | Hazard analysis with code-level mitigations | Phase 4 |
-| `CER.md` | Clinical Evaluation Report — alarm fatigue PPV justification with citations | Phase 4 |
+| `SDP.md` | Software Development Plan — GitHub Actions, CI/CD pipeline | ✔ Done |
+| `SRS.md` | Software Requirements Spec — testable statements (see §7.2) | ✔ Done |
+| `SAD.md` | Software Architecture Document — safety segregation (backend vs UI) | ✔ Done |
+| `SOUP.md` | Software of Unknown Provenance — .NET 8, React, Hangfire, PostgreSQL risk tracking | ✔ Done |
+| `ISO14971_Risk_Matrix.md` | Hazard analysis with code-level mitigations | ✔ Done |
+| `CER.md` | Clinical Evaluation Report — alarm fatigue PPV justification with citations | ✔ Done |
 
 ---
 
@@ -250,7 +250,7 @@ Supabase is used strictly as a cloud-hosted PostgreSQL instance. The SDK, Auth, 
 | :--- | :--- | :--- | :--- |
 | CSV replay simulator | ✔ Done | — | `device_simulator.py` with row offsets |
 | HL7 v2 & FHIR Integration | ✘ Missing | P2 | Support both HL7 v2 and FHIR (vital signs as Observations) for practical EHR integration |
-| Device certificate & pairing | ✘ Missing | P3 | Add `devices.certificate_thumbprint` column + pairing endpoint |
+| Device certificate & pairing | ✔ Done | P3 | Add `devices.certificate_thumbprint` column + pairing endpoint |
 | Sensor calibration log | ✔ Done | P2 | New table: `calibration_records` (device_id, offset, calibrated_at, technician) |
 
 ### 8.2 Clinical Logic & Alerting

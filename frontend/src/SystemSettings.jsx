@@ -4,31 +4,33 @@ import axios from 'axios';
 import { 
   Settings, ShieldCheck, Save, Database, FileText, 
   Lock, CheckCircle2, AlertTriangle, Activity, 
-  Thermometer, Clock, RefreshCw, Monitor 
+  Thermometer, Clock, RefreshCw, Monitor, Link2, X
 } from 'lucide-react';
 
 export default function SystemSettings({ backendUrl }) {
-  const [activeTab, setActiveTab] = useState('parameters'); // parameters | audit
+  const [activeTab, setActiveTab] = useState('parameters'); // parameters | audit | maintenance
 
   // Parameters State
-  const [thresholds, setThresholds] = useState({
-    hrMin: 40, hrMax: 120,
-    spo2Min: 90,
-    tempMin: 35.0, tempMax: 39.0,
-    retention: 30
+  const [thresholds, setThresholds] = useState({ 
+    hrMin: 40, hrMax: 120, 
+    spo2Min: 90, 
+    tempMin: 35.0, tempMax: 39.0, 
+    retention: 30 
   });
   const [isSaving, setIsSaving] = useState(false);
-  const[saveMessage, setSaveMessage] = useState('');
+  const [saveMessage, setSaveMessage] = useState('');
 
   // Audit State
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
-  const [verifyStatus, setVerifyStatus] = useState('idle'); // idle | loading | success | error
+  const [verifyStatus, setVerifyStatus] = useState('idle');
   const [verifyMessage, setVerifyMessage] = useState('');
 
-  // Maintenance State
+  // Maintenance & Pairing State
   const [devices, setDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
+  const [pairingDeviceId, setPairingDeviceId] = useState(null);
+  const [thumbprintInput, setThumbprintInput] = useState('');
 
   useEffect(() => {
     if (activeTab === 'audit') {
@@ -56,9 +58,23 @@ export default function SystemSettings({ backendUrl }) {
         notes: "Routine calibration via System Settings",
         passed: true
       });
-      fetchDevices(); // Refresh list to show updated calibration data
+      fetchDevices();
     } catch (err) {
       alert("Failed to log calibration. Check your permissions.");
+    }
+  };
+
+  const submitPairing = async (e, deviceId) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${backendUrl}/api/devices/${deviceId}/pair`, {
+        certificateThumbprint: thumbprintInput
+      });
+      setPairingDeviceId(null);
+      setThumbprintInput('');
+      fetchDevices(); // Refresh list to show new thumbprint
+    } catch (err) {
+      alert("Failed to pair device. Check permissions or network.");
     }
   };
 
@@ -69,7 +85,6 @@ export default function SystemSettings({ backendUrl }) {
       setLogs(res.data);
     } catch (err) {
       console.error("Failed to fetch logs", err);
-      // Fallback mock logs if endpoint is unavailable
       setLogs([
         { id: 105, userId: 'sys-admin', action: 'RESOLVE_ALERT', entityType: 'Alert', entityId: '842', occurredAt: new Date().toISOString(), hash: 'a1b2c3d4e5f6g7h8i9j0...' },
         { id: 104, userId: 'dr-sarah', action: 'ADMIT_PATIENT', entityType: 'Patient', entityId: 'P-991', occurredAt: new Date(Date.now() - 3600000).toISOString(), hash: 'b2c3d4e5f6g7h8i9j0a1...' },
@@ -94,7 +109,6 @@ export default function SystemSettings({ backendUrl }) {
   const handleSaveParameters = (e) => {
     e.preventDefault();
     setIsSaving(true);
-    // Mock API call to save global parameters (Since backend reads from hardcoded limits currently)
     setTimeout(() => {
       setIsSaving(false);
       setSaveMessage('System parameters successfully updated and staged for edge devices.');
@@ -149,15 +163,12 @@ export default function SystemSettings({ backendUrl }) {
       {activeTab === 'parameters' && (
         <form onSubmit={handleSaveParameters} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Clinical Thresholds */}
             <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Activity size={16} className="text-emerald-400" />
                 <h3 className="font-bold text-white">Default Clinical Thresholds</h3>
               </div>
               <p className="text-xs text-slate-500 mb-6">These are the global fallback limits. They can be overridden per patient by a Doctor.</p>
-              
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -169,12 +180,10 @@ export default function SystemSettings({ backendUrl }) {
                     <input type="number" value={thresholds.hrMax} onChange={e => setThresholds({...thresholds, hrMax: e.target.value})} className="w-full mt-1.5 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500" />
                   </div>
                 </div>
-                
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">SpO₂ Minimum (%)</label>
                   <input type="number" value={thresholds.spo2Min} onChange={e => setThresholds({...thresholds, spo2Min: e.target.value})} className="w-full mt-1.5 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500" />
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Temp Min (°C)</label>
@@ -187,15 +196,12 @@ export default function SystemSettings({ backendUrl }) {
                 </div>
               </div>
             </div>
-
-            {/* Retention & Compliance */}
             <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <FileText size={16} className="text-amber-400" />
                 <h3 className="font-bold text-white">Compliance & Retention</h3>
               </div>
               <p className="text-xs text-slate-500 mb-6">Configure data lifecycle to comply with PDPA Principle 7 regarding patient records.</p>
-              
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Telemetry Purge Window (Days)</label>
                 <div className="relative mt-1.5">
@@ -206,7 +212,6 @@ export default function SystemSettings({ backendUrl }) {
               </div>
             </div>
           </div>
-
           <div className="flex items-center gap-4">
             <button type="submit" disabled={isSaving} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors">
               {isSaving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
@@ -220,7 +225,6 @@ export default function SystemSettings({ backendUrl }) {
       {/* ── AUDIT TAB ── */}
       {activeTab === 'audit' && (
         <div className="space-y-6">
-          {/* Integrity Banner */}
           <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <h3 className="font-bold text-white flex items-center gap-2">
@@ -236,7 +240,6 @@ export default function SystemSettings({ backendUrl }) {
               {verifyStatus === 'loading' ? 'VERIFYING...' : 'VERIFY INTEGRITY'}
             </button>
           </div>
-
           {verifyStatus === 'success' && (
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-sm flex items-center gap-2">
               <CheckCircle2 size={16} /> {verifyMessage}
@@ -247,8 +250,6 @@ export default function SystemSettings({ backendUrl }) {
               <AlertTriangle size={16} /> {verifyMessage}
             </div>
           )}
-
-          {/* Logs Table */}
           <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl overflow-hidden">
             {loadingLogs ? (
               <div className="p-8 text-center text-slate-500 text-sm">Fetching audit trail...</div>
@@ -266,18 +267,10 @@ export default function SystemSettings({ backendUrl }) {
                 <tbody className="divide-y divide-slate-800/40">
                   {logs.map((log) => (
                     <tr key={log.id} className="hover:bg-slate-800/20 transition-colors">
-                      <td className="px-5 py-3 text-slate-400 text-xs">
-                        {new Date(log.occurredAt).toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3 text-slate-300 font-mono text-xs">
-                        {log.userId?.substring(0, 8) || 'SYSTEM'}
-                      </td>
-                      <td className="px-5 py-3 text-violet-400 font-semibold text-xs">
-                        {log.action}
-                      </td>
-                      <td className="px-5 py-3 text-slate-400 text-xs">
-                        {log.entityType} <span className="text-slate-600">#{log.entityId || 'N/A'}</span>
-                      </td>
+                      <td className="px-5 py-3 text-slate-400 text-xs">{new Date(log.occurredAt).toLocaleString()}</td>
+                      <td className="px-5 py-3 text-slate-300 font-mono text-xs">{log.userId?.substring(0, 8) || 'SYSTEM'}</td>
+                      <td className="px-5 py-3 text-violet-400 font-semibold text-xs">{log.action}</td>
+                      <td className="px-5 py-3 text-slate-400 text-xs">{log.entityType} <span className="text-slate-600">#{log.entityId || 'N/A'}</span></td>
                       <td className="px-5 py-3 text-right">
                         <span className="font-mono text-[10px] text-emerald-400/70 bg-emerald-500/10 px-2 py-1 rounded" title={log.hash}>
                           {log.hash ? log.hash.substring(0, 16) + '...' : 'PENDING'}
@@ -285,9 +278,6 @@ export default function SystemSettings({ backendUrl }) {
                       </td>
                     </tr>
                   ))}
-                  {logs.length === 0 && (
-                    <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-600 text-sm">No audit logs found.</td></tr>
-                  )}
                 </tbody>
               </table>
             )}
@@ -295,11 +285,12 @@ export default function SystemSettings({ backendUrl }) {
         </div>
       )}
 
+      {/* ── MAINTENANCE & PAIRING TAB ── */}
       {activeTab === 'maintenance' && (
         <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-white flex items-center gap-2">
-                  <Settings size={16} className="text-orange-400" /> Calibration & Safety Logs
+                  <Settings size={16} className="text-orange-400" /> Hardware Integration & Calibration
               </h3>
           </div>
           <div className="space-y-4">
@@ -308,25 +299,58 @@ export default function SystemSettings({ backendUrl }) {
               ) : devices.length === 0 ? (
                  <div className="p-4 text-center text-slate-500 text-sm">No devices available.</div>
               ) : devices.map(d => (
-                  <div key={d.id} className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-800">
-                      <div>
-                          <div className="text-sm font-bold text-white">{d.deviceCode}</div>
-                          <div className="text-xs text-slate-500 mt-1">
-                              Last Calibrated: {d.lastCalibration ? new Date(d.lastCalibration.calibratedAt).toLocaleDateString() : 'Never'}
-                              {d.lastCalibration && <span className="ml-2">by {d.lastCalibration.technician}</span>}
+                  <div key={d.id} className="flex flex-col p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                      <div className="flex items-center justify-between">
+                          <div>
+                              <div className="text-sm font-bold text-white flex items-center gap-2">
+                                  {d.deviceCode}
+                                  {d.certificateThumbprint && (
+                                      <span className="bg-violet-500/10 text-violet-400 border border-violet-500/30 text-[9px] px-1.5 py-0.5 rounded font-mono">mTLS Secured</span>
+                                  )}
+                              </div>
+                              <div className="text-xs text-slate-500 mt-1">
+                                  Last Calibrated: {d.lastCalibration ? new Date(d.lastCalibration.calibratedAt).toLocaleDateString() : 'Never'}
+                                  {d.lastCalibration && <span className="ml-2">by {d.lastCalibration.technician}</span>}
+                              </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                              {d.lastCalibration?.passed && (
+                                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">PASSED</span>
+                              )}
+                              <button onClick={() => setPairingDeviceId(d.id)} className="text-xs text-violet-400 hover:text-violet-300 font-bold px-3 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors flex items-center gap-1">
+                                  <Link2 size={12} /> PAIR HARDWARE
+                              </button>
+                              <button onClick={() => handleCalibrate(d.id)} className="text-xs text-blue-400 hover:text-blue-300 font-bold px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-colors">
+                                  LOG CALIBRATION
+                              </button>
                           </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                          {d.lastCalibration?.passed && (
-                              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">PASSED</span>
-                          )}
-                          {d.lastCalibration && !d.lastCalibration.passed && (
-                              <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20">FAILED</span>
-                          )}
-                          <button onClick={() => handleCalibrate(d.id)} className="text-xs text-blue-400 hover:text-blue-300 font-bold px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-colors">
-                              LOG CALIBRATION
-                          </button>
-                      </div>
+
+                      {/* Inline Pairing Form */}
+                      {pairingDeviceId === d.id && (
+                          <div className="mt-4 pt-4 border-t border-slate-800 animate-in slide-in-from-top-2">
+                              <form onSubmit={(e) => submitPairing(e, d.id)} className="flex items-end gap-3">
+                                  <div className="flex-1">
+                                      <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1">X.509 Certificate Thumbprint (SHA-256)</label>
+                                      <input 
+                                          type="text" 
+                                          required
+                                          value={thumbprintInput}
+                                          onChange={(e) => setThumbprintInput(e.target.value)}
+                                          placeholder="e.g. A1:B2:C3:D4:E5..."
+                                          className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 outline-none focus:border-violet-500 font-mono"
+                                      />
+                                  </div>
+                                  <button type="submit" className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-xs font-bold transition-colors">
+                                      SAVE PAIRING
+                                  </button>
+                                  <button type="button" onClick={() => setPairingDeviceId(null)} className="p-2 text-slate-500 hover:text-slate-300 transition-colors">
+                                      <X size={16} />
+                                  </button>
+                              </form>
+                          </div>
+                      )}
                   </div>
               ))}
           </div>
