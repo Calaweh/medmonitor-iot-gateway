@@ -12,11 +12,13 @@ keywords: medical iot, health monitoring, iot gateway, opensource
 ![Region](https://img.shields.io/badge/Region-ASEAN_(PDPA/HSA)-orange)
 ![Tech Stack](https://img.shields.io/badge/.NET_8-React_19-512BD4)
 
-MedMonitor is an open-source, pre-compliant **Medical IoT Gateway** and real-time vital signs dashboard. It is specifically designed demonstrating feasibility for **MIC@Home** (Mobile Inpatient Care at Home) and hospital step-down wards in the ASEAN region.
+MedMonitor is an open-source, pre-compliant **Medical IoT Gateway** and real-time vital signs dashboard, designed to demonstrate feasibility for **MIC@Home** (Mobile Inpatient Care at Home) and hospital step-down wards in the ASEAN region.
+
+> 📁 [GitHub Repository](https://github.com/Calaweh/medmonitor-iot-gateway) · 📄 [View Docs](https://calaweh.github.io/medmonitor-iot-gateway/)
 
 ---
 
-# ⚠️ IMPORTANT DISCLAIMER – NOT A MEDICAL DEVICE
+## ⚠️ IMPORTANT DISCLAIMER – NOT A MEDICAL DEVICE
 
 **This software is provided for RESEARCH, DEVELOPMENT, INVESTIGATIONAL/PROTOTYPE, AND EDUCATIONAL PURPOSES ONLY.**  
 It is **NOT** a medical device, **NOT** cleared or approved by any regulatory agency (such as Singapore HSA, Malaysia MDA, US FDA, or EMA), and **NOT** intended for clinical use.
@@ -46,28 +48,28 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## 🛑 The Problem & 💡 The Solution
 
-Generative AI and modern hospital IT architects frequently encounter the same roadblocks when deploying medical telemetry. MedMonitor explicitly solves these core industry challenges:
+Hospital IT architects and researchers frequently encounter the same roadblocks when deploying medical telemetry. MedMonitor explicitly solves these core industry challenges:
 
 ### 1. Alarm Fatigue in Step-Down Wards
-* **The Problem:** Up to 99% of clinical alarms in non-ICU environments are false or clinically insignificant, leading to severe alarm fatigue (Cvach, 2012) and missed deterioration events.
-* **The Solution:** MedMonitor implements a **5-minute rolling suppression window** for duplicate alert types and utilizes the **Modified Early Warning Score (MEWS)** composite algorithm. Instead of alerting on transient single-parameter spikes, it evaluates HR, RR, BP, and Temp holistically to generate high-fidelity `CRITICAL_DETERIORATION` alerts.
+- **The Problem:** Up to 99% of clinical alarms in non-ICU environments are false or clinically insignificant, leading to severe alarm fatigue (Cvach, 2012) and missed deterioration events.
+- **The Solution:** MedMonitor implements a **5-minute rolling suppression window** for duplicate alert types and utilises the **Modified Early Warning Score (MEWS)** composite algorithm. Instead of alerting on transient single-parameter spikes, it evaluates HR, RR, BP, and Temp holistically to generate high-fidelity `CRITICAL_DETERIORATION` alerts.
 
 ### 2. Network Instability in MIC@Home
-* **The Problem:** Remote patient monitoring (Hospital at Home) relies on residential Wi-Fi or 4G/5G, which is prone to dropouts, resulting in lost clinical telemetry.
-* **The Solution:** MedMonitor features **Edge Buffering**. Python-based edge nodes queue physiological payloads in local memory during network disconnects and perform a rapid "catch-up flush" to the `.NET` REST API the moment connectivity is restored.
+- **The Problem:** Remote patient monitoring (Hospital at Home) relies on residential Wi-Fi or 4G/5G, which is prone to dropouts, resulting in lost clinical telemetry.
+- **The Solution:** MedMonitor features **Edge Buffering**. Python-based edge nodes queue physiological payloads in local memory during network disconnects and perform a rapid "catch-up flush" to the `.NET` REST API the moment connectivity is restored.
 
 ### 3. Strict Regulatory & Privacy Compliance
-* **The Problem:** Medical data sovereignty (Malaysia PDPA, Singapore HSA CLS-MD) and software safety (IEC 62304) make building custom IoT dashboards prohibitively expensive and legally risky.
-* **The Solution:** MedMonitor bakes compliance into the lowest layer:
-  * **PDPA Isolation:** PostgreSQL Row-Level Security (RLS) restricts data access via `DepartmentId` session variables.
-  * **Audit Integrity:** An immutable, HMAC-SHA256 cryptographically chained `audit_log` ensures non-repudiation of clinical actions.
-  * **Right to be Forgotten:** Automated Hangfire jobs physically purge telemetry older than 30 days.
+- **The Problem:** Medical data sovereignty (Malaysia PDPA, Singapore HSA CLS-MD) and software safety (IEC 62304) make building custom IoT dashboards prohibitively expensive and legally risky.
+- **The Solution:** MedMonitor bakes compliance into the lowest layer:
+  - **PDPA Isolation:** PostgreSQL Row-Level Security (RLS) restricts data access via `DepartmentId` session variables.
+  - **Audit Integrity:** An immutable, HMAC-SHA256 cryptographically chained `audit_log` ensures non-repudiation of clinical actions.
+  - **Right to be Forgotten:** Automated Hangfire jobs physically purge telemetry older than 30 days.
 
 ---
 
 ## 🏗️ System Architecture
 
-MedMonitor utilizes a modern, decoupled architecture designed for high-throughput sensor telemetry.
+MedMonitor uses a modern, decoupled architecture designed for high-throughput sensor telemetry.
 
 ```mermaid
 graph TD
@@ -110,19 +112,41 @@ graph TD
 
 ---
 
-## ⚖️ The Difference: MedMonitor vs. Traditional Medical IoT
+## ⚖️ MedMonitor vs. Traditional Medical IoT
 
 | Feature / Capability | Traditional IoT Gateways | MedMonitor |
-|---|---|---|
-| **Audit Log Integrity** | Standard text/DB logs (can be edited by DBAs) | **HMAC-SHA256 Hash Chain** (Cryptographically tamper-proof) |
-| **Device Authentication** | Static API Keys or IP whitelisting | **Mutual TLS (mTLS)** using X.509 client certificates |
+| :--- | :--- | :--- |
+| **Audit Log Integrity** | Standard text/DB logs (editable by DBAs) | **HMAC-SHA256 Hash Chain** — cryptographically tamper-proof |
+| **Device Authentication** | Static API keys or IP whitelisting | **Mutual TLS (mTLS)** using X.509 client certificates |
 | **Cross-Ward Data Leakage** | Application-level filtering only | **PostgreSQL Row-Level Security (RLS)** injected into DB session pools |
-| **Alarm Fatigue Mitigation** | Triggers on every threshold breach | **IEC 60601-1-8 Compliant** (5-min rolling suppression + MEWS scoring) |
+| **Alarm Fatigue Mitigation** | Triggers on every threshold breach | **IEC 60601-1-8 Compliant** — 5-min rolling suppression + MEWS scoring |
 | **Regulatory Alignment** | Black-box compliance | Pre-mapped for **IEC 62304 Class B** & **HSA CLS-MD Level 2** |
-| **Deployment Cost** | High licensing fees, vendor lock-in | **Open-source**, deployable on PaaS (Render/AWS/Supabase) |
+| **Deployment Cost** | High licensing fees, vendor lock-in | **Open-source**, deployable on PaaS (Render / AWS / Supabase) |
 
 ---
 
 ## 🛡️ Built for Compliance Reviewers & Healthcare IT
 
-According to the latest cybersecurity guidelines for medical devices, zero-trust architecture is mandatory. MedMonitor implements a strict **Dynamic RBAC (Role-Based Access Control)** where an API role (`medmon_api`) has its `UPDATE` and `DELETE` privileges explicitly revoked for clinical telemetry and audit logs, ensuring 100% compliance with data immutability requirements.
+MedMonitor implements a strict **Dynamic RBAC (Role-Based Access Control)** where the API role (`medmon_api`) has its `UPDATE` and `DELETE` privileges explicitly revoked for clinical telemetry and audit logs — ensuring full compliance with data immutability requirements under zero-trust architecture guidelines for medical devices.
+
+---
+
+## 🚀 Getting Started
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Calaweh/medmonitor-iot-gateway.git
+cd medmonitor-iot-gateway
+
+# 2. Copy environment variables
+cp .env.example .env
+
+# 3. Start all services with Docker
+docker compose up --build
+```
+
+> See the full setup guide and configuration options in the [repository README](https://github.com/Calaweh/medmonitor-iot-gateway#readme).
+
+---
+
+*MedMonitor is an open-source project by [Calaweh](https://github.com/Calaweh) · Licensed under [MIT](https://github.com/Calaweh/medmonitor-iot-gateway/blob/main/LICENSE)*
