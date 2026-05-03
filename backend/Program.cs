@@ -3,6 +3,7 @@ using MedicalDeviceMonitor.Hubs;
 using MedicalDeviceMonitor.Services;
 using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
+using Npgsql;
 using Serilog;
 using Serilog.Sinks.Grafana.Loki;
 using Serilog.Context;
@@ -284,7 +285,15 @@ app.Use(async (context, next) =>
                 await db.Database.ExecuteSqlRawAsync("SELECT set_config('app.user_dept_id', @p0, false)", deptId);
                 await db.Database.ExecuteSqlRawAsync("SELECT set_config('app.user_role', @p1, false)", role);
             }
-            catch (Exception ex)
+            catch (DbUpdateException ex)
+            {
+                Log.Warning(ex, "Failed to set RLS context for user {User}", context.User.Identity.Name);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Log.Warning(ex, "Failed to set RLS context for user {User}", context.User.Identity.Name);
+            }
+            catch (NpgsqlException ex)
             {
                 Log.Warning(ex, "Failed to set RLS context for user {User}", context.User.Identity.Name);
             }
@@ -337,7 +346,11 @@ using (var scope = app.Services.CreateScope())
 
             logger.LogInformation("Database schema hotfix applied successfully.");
         }
-        catch (Exception ex)
+        catch (System.Data.Common.DbException ex)
+        {
+            logger.LogError(ex, "Failed to apply database schema hotfix.");
+        }
+        catch (InvalidOperationException ex)
         {
             logger.LogError(ex, "Failed to apply database schema hotfix.");
         }

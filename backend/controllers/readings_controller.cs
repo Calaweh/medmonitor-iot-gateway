@@ -28,13 +28,10 @@ public class ReadingsController : ControllerBase
 
     [AllowAnonymous]
     [EnableRateLimiting("ingest")]
+    [RequestSizeLimit(50000)] // HSA/MDA Security: Strict 50KB limit enforced by server to prevent DoS via large payloads
     [HttpPost("ingest")]
     public async Task<IActionResult> IngestData([FromBody] IngestReadingDto dto)
     {
-        // Basic DoS Protection
-        if (Request.ContentLength > 50000) // 50KB limit for vitals
-            return StatusCode(413, "Payload too large");
-
         if (dto.Payload.ValueKind != JsonValueKind.Object)
             return BadRequest("Invalid payload format");
             
