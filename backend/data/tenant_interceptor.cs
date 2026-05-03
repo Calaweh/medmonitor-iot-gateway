@@ -31,11 +31,11 @@ public class TenantInterceptor : DbCommandInterceptor
 
         // PREVENT POOL POISONING:
         // Use 'SET LOCAL' so the variables are automatically wiped when the transaction ends.
-        // This is mandatory for Supabase Port 6543.
+        // These values are derived from validated JWT claims, making string interpolation safe here.
         var sqlSetup = $@"
-            SET LOCAL app.current_user_id = '{userId}';
-            SET LOCAL app.user_role = '{userRole}';
-            SET LOCAL app.user_dept_id = '{deptId}';
+            SET LOCAL app.current_user_id = '{userId.Replace("'", "''")}';
+            SET LOCAL app.user_role = '{userRole.Replace("'", "''")}';
+            SET LOCAL app.user_dept_id = '{deptId.Replace("'", "''")}';
         ";
 
         command.CommandText = sqlSetup + command.CommandText;

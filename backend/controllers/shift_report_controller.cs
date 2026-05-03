@@ -65,7 +65,6 @@ public class ShiftReportController : ControllerBase
         var stats = ComputeVitalStats(readingsList);
 
         // --- 5. Build PDF ---
-        QuestPDF.Settings.License = LicenseType.Community;
 
         var patientName = assignment?.Patient?.FullName ?? "Unknown Patient";
         var patientMrn  = assignment?.Patient?.Mrn ?? "N/A";

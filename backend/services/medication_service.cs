@@ -23,33 +23,26 @@ public class MedicationService
             await _db.Database.ExecuteSqlRawAsync("SELECT set_config('app.user_role', 'system', false)");
 
             var now = DateTime.UtcNow;
-            // Find meds scheduled in the past that are still 'scheduled' and not administered
-            var overdueMeds = await _db.Set<MedicationSchedule>()
-                .Where(m => m.Status == "scheduled" && m.ScheduledAt < now.AddMinutes(-30))
-                .ToListAsync();
+            // Fix N+1: Join BedAssignments directly in the initial query
+            var overdueData = await (from med in _db.Set<MedicationSchedule>()
+                                     join bed in _db.BedAssignments on med.PatientId equals bed.PatientId
+                                     where med.Status == "scheduled" 
+                                        && med.ScheduledAt < now.AddMinutes(-30)
+                                        && bed.DischargedAt == null
+                                     select new { med, bed.DeviceId }).ToListAsync();
 
-        foreach (var med in overdueMeds)
-        {
-            med.Status = "overdue";
-            
-            // Link to the device the patient is currently in (if any) to trigger a bed alert
-            var currentBed = await _db.BedAssignments
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(b => b.PatientId == med.PatientId && b.DischargedAt == null);
-
-            if (currentBed != null)
-            {
+            foreach (var item in overdueData) {
+                item.med.Status = "overdue";
                 _db.Alerts.Add(new Alert {
-                    DeviceId = currentBed.DeviceId,
+                    DeviceId = item.DeviceId,
                     AlertType = "MISSED_MEDICATION",
                     Severity = "WARNING",
-                    Message = $"Overdue Medication: {med.MedicationName} ({med.Dosage}) was scheduled for {med.ScheduledAt:HH:mm}",
+                    Message = $"Overdue: {item.med.MedicationName} was scheduled for {item.med.ScheduledAt:HH:mm}",
                     CreatedAt = DateTime.UtcNow
                 });
             }
-        }
 
-        await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync();
         }
         finally
         {

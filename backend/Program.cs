@@ -3,6 +3,7 @@ using MedicalDeviceMonitor.Hubs;
 using MedicalDeviceMonitor.Services;
 using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
+using Npgsql;
 using Serilog;
 using Serilog.Sinks.Grafana.Loki;
 using Serilog.Context;
@@ -12,12 +13,19 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 using MedicalDeviceMonitor.Models;
 using System.Security.Claims;
 using System.Reflection; 
 using Hangfire;
 using Hangfire.PostgreSql;
+using QuestPDF.Infrastructure;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
+using MedicalDeviceMonitor.Authorization;
+
+
 
 // Load .env.local and force overwrite existing env vars
 Env.Load("../.env", new LoadOptions(
@@ -27,6 +35,11 @@ Env.Load("../.env", new LoadOptions(
 ));
 
 var lokiUrl = Environment.GetEnvironmentVariable("LOKI_URL") ?? "http://localhost:3100";
+
+// --- GLOBAL SETTINGS ---
+QuestPDF.Settings.License = LicenseType.Community;
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear(); // Ensure 'sub' maps to ClaimTypes.NameIdentifier
+
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -75,7 +88,8 @@ builder.Services.AddHealthChecks()
 // ─── JWT Authentication & Validation ────────────────────────────────────────
 var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
                 ?? builder.Configuration["Jwt:Secret"]
-                ?? "FallbackSecretKeyThatIsAtLeast32BytesLong!";
+                ?? throw new InvalidOperationException("CRITICAL: JWT_SECRET is not configured.");
+
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -134,6 +148,16 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
+
+// ─── Rate Limiting ──────────────────────────────────────────────────────────
+builder.Services.AddRateLimiter(options => {
+    options.AddFixedWindowLimiter("ingest", o => {
+        o.PermitLimit = 60; // 60 readings per minute per device
+        o.Window = TimeSpan.FromMinutes(1);
+        o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+    });
+});
+
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -203,6 +227,15 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "MedMonitor v2.1"));
 }
 
+app.UseRateLimiter();
+
+// ─── Hangfire Dashboard ─────────────────────────────────────────────────────
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = new[] { new HangfireAuthFilter() }
+});
+
+
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     Predicate = _ => false,
@@ -235,6 +268,40 @@ app.Use(async (context, next) =>
     }
 });
 
+// --- HSA CLS-MD LEVEL 2: RLS CONTEXT PROPAGATION ---
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        var db = context.RequestServices.GetRequiredService<AppDbContext>();
+        var deptId = context.User.FindFirst("DepartmentId")?.Value;
+        var role = context.User.FindFirst(ClaimTypes.Role)?.Value ?? "nurse";
+
+        if (!string.IsNullOrEmpty(deptId))
+        {
+            try 
+            {
+                // Set session variables for Postgres RLS policies
+                await db.Database.ExecuteSqlRawAsync("SELECT set_config('app.user_dept_id', @p0, false)", deptId);
+                await db.Database.ExecuteSqlRawAsync("SELECT set_config('app.user_role', @p1, false)", role);
+            }
+            catch (DbUpdateException ex)
+            {
+                Log.Warning(ex, "Failed to set RLS context for user {User}", context.User.Identity.Name);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Log.Warning(ex, "Failed to set RLS context for user {User}", context.User.Identity.Name);
+            }
+            catch (NpgsqlException ex)
+            {
+                Log.Warning(ex, "Failed to set RLS context for user {User}", context.User.Identity.Name);
+            }
+        }
+    }
+    await next();
+});
+
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
@@ -247,6 +314,47 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        // --- SCHEMA HOTFIX: Apply missing columns that CREATE TABLE IF NOT EXISTS skipped ---
+        try 
+        {
+            var migrationSql = @"
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS department_id UUID REFERENCES departments(id) ON DELETE SET NULL;
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS certificate_thumbprint VARCHAR(64);
+                ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+
+                ALTER TABLE alerts ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMPTZ;
+                ALTER TABLE alerts ADD COLUMN IF NOT EXISTS acknowledged_by UUID REFERENCES users(id);
+
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(255);
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS is_totp_enabled BOOLEAN DEFAULT FALSE;
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id UUID REFERENCES departments(id) ON DELETE SET NULL;
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT DEFAULT 1;
+                ALTER TABLE users ALTER COLUMN token_version TYPE INT USING NULLIF(token_version::text, '')::integer;
+
+                ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS ip_address INET;
+
+                ALTER TABLE bed_assignments ADD COLUMN IF NOT EXISTS attending_physician VARCHAR(100);
+                ALTER TABLE bed_assignments ADD COLUMN IF NOT EXISTS admission_type VARCHAR(50);
+            ";
+            await db.Database.ExecuteSqlRawAsync(migrationSql);
+            
+            // Apply seed data for devices that might be missing a department
+            await db.Database.ExecuteSqlRawAsync("INSERT INTO departments (name, site) VALUES ('ICU', 'Main Campus') ON CONFLICT (name) DO NOTHING;");
+            await db.Database.ExecuteSqlRawAsync("UPDATE devices SET department_id = (SELECT id FROM departments WHERE name = 'ICU') WHERE department_id IS NULL;");
+
+            logger.LogInformation("Database schema hotfix applied successfully.");
+        }
+        catch (System.Data.Common.DbException ex)
+        {
+            logger.LogError(ex, "Failed to apply database schema hotfix.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogError(ex, "Failed to apply database schema hotfix.");
+        }
+
         var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
         recurringJobManager.AddOrUpdate<RetentionService>(
             "purge-old-readings", 

@@ -90,7 +90,11 @@ public class InteroperabilityController : ControllerBase
             };
 
             // Enterprise integration engines inject the key at the network edge
-            var apiKey = Request.Headers["X-Device-Api-Key"].FirstOrDefault() ?? "Admin123!";
+            var apiKey = Request.Headers["X-Device-Api-Key"].FirstOrDefault();
+            if (string.IsNullOrEmpty(apiKey)) 
+            {
+                return Unauthorized(new { error = "Device authentication required for interoperability ingestion." });
+            }
             await _readingService.ProcessNewReadingAsync(dto, apiKey);
             
             return Ok(new { message = "FHIR Observation successfully mapped and ingested." });
@@ -163,7 +167,11 @@ public class InteroperabilityController : ControllerBase
                 Payload = JsonDocument.Parse(payloadNode.ToJsonString()).RootElement
             };
 
-            var apiKey = Request.Headers["X-Device-Api-Key"].FirstOrDefault() ?? "Admin123!";
+            var apiKey = Request.Headers["X-Device-Api-Key"].FirstOrDefault();
+            if (string.IsNullOrEmpty(apiKey)) 
+            {
+                return Unauthorized(new { error = "Device authentication required for interoperability ingestion." });
+            }
             await _readingService.ProcessNewReadingAsync(dto, apiKey);
 
             // Respond with an HL7 ACK (Acknowledgment) message required by MLLP bridges

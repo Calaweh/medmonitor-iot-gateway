@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
+using Microsoft.AspNetCore.SignalR;
+using MedicalDeviceMonitor.Hubs;
+
 namespace MedicalDeviceMonitor.Controllers;
 
 [Authorize]
@@ -16,10 +19,13 @@ public class AlertsController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly AuditService _auditService;
-    public AlertsController(AppDbContext db, AuditService auditService)
+    private readonly IHubContext<VitalSignsHub> _hubContext;
+
+    public AlertsController(AppDbContext db, AuditService auditService, IHubContext<VitalSignsHub> hubContext)
     {
         _db = db;
         _auditService = auditService;
+        _hubContext = hubContext;
     }
 
     [HttpGet]
@@ -41,8 +47,24 @@ public class AlertsController : ControllerBase
         var alerts = await query.Where(a => !a.IsResolved).OrderByDescending(a => a.CreatedAt).Take(50).ToListAsync();
         
         return Ok(alerts.Select(a => new {
-            a.Id, DeviceCode = a.Device!.DeviceCode, a.AlertType, a.Severity, a.Message, a.CreatedAt
+            a.Id, DeviceCode = a.Device!.DeviceCode, a.AlertType, a.Severity, a.Message, a.CreatedAt, a.AcknowledgedAt
         }));
+    }
+
+    [HttpPost("{id}/acknowledge")]
+    [RequirePermission("alerts:resolve")] // Reuse resolve permission for now or add alerts:acknowledge
+    public async Task<IActionResult> AcknowledgeAlert(long id)
+    {
+        var alert = await _db.Alerts.FirstOrDefaultAsync(a => a.Id == id);
+        if (alert == null) return NotFound();
+
+        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        alert.AcknowledgedAt = DateTime.UtcNow;
+        alert.AcknowledgedBy = userIdString != null ? Guid.Parse(userIdString) : (Guid?)null;
+
+        await _db.SaveChangesAsync();
+        await _hubContext.Clients.All.SendAsync("AlertAcknowledged", new { id = alert.Id, acknowledgedAt = alert.AcknowledgedAt });
+        return Ok(new { message = "Alert acknowledged." });
     }
 
     [HttpPost("{id}/resolve")]
@@ -76,6 +98,8 @@ public class AlertsController : ControllerBase
                 await _db.SaveChangesAsync(); 
                 await _auditService.LogActionAsync(userId, "RESOLVE_ALERT", "Alert", id.ToString()); 
                 
+                await _hubContext.Clients.All.SendAsync("AlertResolved", id);
+
                 await transaction.CommitAsync();
                 return Ok(new { message = "Alert resolved and securely logged in audit trail." });
             }

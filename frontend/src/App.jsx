@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useVitals } from './hooks/useVitals';
 import Login from './Login';
 import SystemSettings from './SystemSettings';
+import AccessManagement from './AccessManagement';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Activity, Heart, Thermometer, AlertTriangle, CheckCircle2, Bed,
@@ -13,7 +14,7 @@ import {
   FileText, PenLine, PlusCircle
 } from 'lucide-react';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 
 // ─── NAV CONFIG ────────────────────────────────────────────────────────────────
 // Add new top-level views here for scalability
@@ -154,8 +155,8 @@ export default function App() {
             onClearContext={() => setViewContext(null)} 
           />
         )}
-        {currentView === 'access' && <AccessManagement />}
-        {currentView === 'settings' && <SystemSettings backendUrl={BACKEND_URL} />}
+        {currentView === 'access' && <AccessManagement token={token} />}
+        {currentView === 'settings' && <SystemSettings backendUrl={BACKEND_URL} token={token} />}
       </main>
     </div>
   );
@@ -348,7 +349,9 @@ function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) 
   const [isGenerating, setIsGenerating] = useState(false);
   const [notes, setNotes] = useState([]);
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [isThresholdModalOpen, setIsThresholdModalOpen] = useState(false);
   const [newNote, setNewNote] = useState({ subjective: '', objective: '', assessment: '', plan: '' });
+
 
   useEffect(() => {
     if (patientInfo?.patientId) {
@@ -456,8 +459,17 @@ function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) 
               <History size={13} />
               PREVIOUS PATIENTS
             </button>
+
+            <button
+              onClick={() => setIsThresholdModalOpen(true)}
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-400 text-[11px] tracking-wider font-bold rounded-lg flex items-center gap-2 transition-colors border border-slate-800"
+            >
+              <Settings size={13} />
+              SET THRESHOLDS
+            </button>
           </div>
         </div>
+
 
         <div className="flex gap-3">
           <VitalCard label="Heart Rate" value={payload.heart_rate} unit="bpm" warn={payload.heart_rate > 120 || payload.heart_rate < 40} icon={<Heart size={14} />} color="emerald" />
@@ -491,7 +503,7 @@ function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) 
         <div className="lg:col-span-2 bg-[#0c1220] border border-slate-800/60 rounded-2xl p-5 h-80 flex flex-col">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Live Trend — HR & SpO₂</h3>
           <div className="flex-1">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={readings}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                 <XAxis dataKey="recordedAt" hide />
@@ -519,12 +531,42 @@ function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) 
               {alerts.length === 0 ? (
                 <p className="text-xs text-slate-600 italic">No active alerts.</p>
               ) : alerts.map((a, i) => (
-                <div key={i} className="text-xs p-2.5 rounded-lg bg-red-500/8 border border-red-500/20 text-red-200">
-                  <div className="flex justify-between mb-1 text-red-400/60">
+                <div key={i} className={`text-xs p-2.5 rounded-lg border transition-all ${
+                  a.acknowledgedAt 
+                    ? 'bg-amber-500/5 border-amber-500/20 text-amber-200/80' 
+                    : 'bg-red-500/8 border-red-500/20 text-red-200'
+                }`}>
+                  <div className="flex justify-between mb-1 opacity-60">
                     <span>{new Date(a.createdAt).toLocaleTimeString()}</span>
                     <span className="font-bold">{a.severity}</span>
                   </div>
-                  <p className="text-slate-300">{a.message}</p>
+                  <p className="text-slate-300 mb-2">{a.message}</p>
+                  
+                  <div className="flex gap-2">
+                    {!a.acknowledgedAt && (
+                      <button 
+                        onClick={async () => {
+                          try {
+                            await axios.post(`${BACKEND_URL}/api/alerts/${a.id}/acknowledge`);
+                            // Usually we rely on useVitals to refetch, but we can optimistically update here if we want
+                          } catch (err) { alert("Failed to acknowledge alert"); }
+                        }}
+                        className="flex-1 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-500/20 rounded font-bold transition-all"
+                      >
+                        ACKNOWLEDGE
+                      </button>
+                    )}
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await axios.post(`${BACKEND_URL}/api/alerts/${a.id}/resolve`);
+                        } catch (err) { alert("Failed to resolve alert"); }
+                      }}
+                      className="flex-1 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/20 rounded font-bold transition-all"
+                    >
+                      RESOLVE
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -581,9 +623,90 @@ function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) 
               </div>
           </div>
       )}
+      <ThresholdModal 
+        isOpen={isThresholdModalOpen} 
+        onClose={() => setIsThresholdModalOpen(false)} 
+        patientId={patientInfo?.patientId} 
+        token={token} 
+      />
     </div>
   );
 }
+
+// ─── THRESHOLD MODAL ─────────────────────────────────────────────────────────
+function ThresholdModal({ isOpen, onClose, patientId, token }) {
+  const [thresholds, setThresholds] = useState([
+    { vitalSign: 'heart_rate', minValue: 40, maxValue: 120 },
+    { vitalSign: 'spo2', minValue: 90, maxValue: 100 },
+    { vitalSign: 'temperature', minValue: 35, maxValue: 39 },
+  ]);
+
+  useEffect(() => {
+    if (isOpen && patientId) {
+      axios.get(`${BACKEND_URL}/api/patients/${patientId}/thresholds`)
+        .then(res => { if (res.data.length) setThresholds(res.data); })
+        .catch(err => console.error("Failed to load thresholds", err));
+    }
+  }, [isOpen, patientId]);
+
+  const handleSave = async () => {
+    try {
+      await Promise.all(thresholds.map(t => 
+        axios.post(`${BACKEND_URL}/api/patients/${patientId}/thresholds`, t)
+      ));
+      onClose();
+    } catch (err) {
+      alert("Failed to save thresholds. Ensure you have 'patients:threshold:write' permission.");
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-[#0c1220] border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-bold text-white">Clinical Alarm Thresholds</h3>
+          <button onClick={onClose} className="text-slate-500 hover:text-white"><X size={18} /></button>
+        </div>
+        <div className="space-y-4">
+          {thresholds.map((t, i) => (
+            <div key={t.vitalSign} className="grid grid-cols-3 gap-3 items-center">
+              <span className="text-xs font-bold text-slate-400 uppercase">{t.vitalSign.replace('_', ' ')}</span>
+              <input 
+                type="number" 
+                placeholder="Min" 
+                value={t.minValue || ''} 
+                onChange={e => {
+                  const next = [...thresholds];
+                  next[i].minValue = parseFloat(e.target.value);
+                  setThresholds(next);
+                }}
+                className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white"
+              />
+              <input 
+                type="number" 
+                placeholder="Max" 
+                value={t.maxValue || ''} 
+                onChange={e => {
+                  const next = [...thresholds];
+                  next[i].maxValue = parseFloat(e.target.value);
+                  setThresholds(next);
+                }}
+                className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white"
+              />
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-3 pt-6">
+          <button onClick={onClose} className="flex-1 py-2 bg-slate-800 text-white rounded-lg text-xs font-bold">CANCEL</button>
+          <button onClick={handleSave} className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold">SAVE LIMITS</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 export function DeviceHistory({ deviceCode, backendUrl }) {
   const [activeTab, setActiveTab] = useState('admissions'); // 'admissions' | 'telemetry'
@@ -708,7 +831,7 @@ export function DeviceHistory({ deviceCode, backendUrl }) {
                   <p className="text-slate-600 text-sm italic">Select a date range and click Search Logs.</p>
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <LineChart data={historicalReadings}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                     <XAxis dataKey="recordedAt" stroke="#475569" tick={{ fontSize: 10 }} tickFormatter={(val) => new Date(val).toLocaleTimeString()} />
@@ -746,438 +869,9 @@ function VitalCard({ label, value, unit, warn, icon, color }) {
 }
 
 // ─── ACCESS MANAGEMENT ─────────────────────────────────────────────────────────
-function AccessManagement() {
-  const [activeTab, setActiveTab] = useState('roles');
-  const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newRole, setNewRole] = useState({ name: '', description: '' });
-  const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        const [resRoles, resPerms] = await Promise.all([
-          axios.get(`${BACKEND_URL}/api/AccessManagement/roles`),
-          axios.get(`${BACKEND_URL}/api/AccessManagement/permissions`),
-        ]);
-        setRoles(resRoles.data);
-        setPermissions(resPerms.data);
-        if (resRoles.data.length) setSelectedRole(resRoles.data[0]);
 
-        // Users & groups — graceful fallback if endpoints not yet live
-        try {
-          const resUsers = await axios.get(`${BACKEND_URL}/api/Auth/users`);
-          setUsers(resUsers.data);
-        } catch { setUsers(MOCK_USERS); }
 
-        setGroups(MOCK_GROUPS);
-      } catch {
-        setRoles(MOCK_ROLES);
-        setPermissions(MOCK_PERMISSIONS);
-        setSelectedRole(MOCK_ROLES[0]);
-        setUsers(MOCK_USERS);
-        setGroups(MOCK_GROUPS);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
-
-  const togglePermission = async (roleId, permId) => {
-    if (selectedRole?.isSystemRole) return;
-    try {
-      await axios.post(`${BACKEND_URL}/api/AccessManagement/roles/${roleId}/permissions`, permId, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const res = await axios.get(`${BACKEND_URL}/api/AccessManagement/roles`);
-      setRoles(res.data);
-      setSelectedRole(res.data.find(r => r.id === roleId));
-    } catch {
-      // Optimistic update for demo
-      setRoles(prev => prev.map(r => {
-        if (r.id !== roleId) return r;
-        const hasPerm = r.permissions?.some(p => p.id === permId);
-        return {
-          ...r,
-          permissions: hasPerm
-            ? r.permissions.filter(p => p.id !== permId)
-            : [...(r.permissions || []), permissions.find(p => p.id === permId)],
-        };
-      }));
-      setSelectedRole(prev => {
-        const hasPerm = prev.permissions?.some(p => p.id === permId);
-        return {
-          ...prev,
-          permissions: hasPerm
-            ? prev.permissions.filter(p => p.id !== permId)
-            : [...(prev.permissions || []), permissions.find(p => p.id === permId)],
-        };
-      });
-    }
-  };
-
-  const handleCreateRole = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await axios.post(`${BACKEND_URL}/api/AccessManagement/roles`, newRole);
-      const created = { ...res.data, permissions: [] };
-      setRoles(prev => [...prev, created]);
-      setSelectedRole(created);
-    } catch {
-      const mock = { id: Date.now().toString(), ...newRole, isSystemRole: false, permissions: [] };
-      setRoles(prev => [...prev, mock]);
-      setSelectedRole(mock);
-    }
-    setIsModalOpen(false);
-    setNewRole({ name: '', description: '' });
-  };
-
-  const filteredUsers = users.filter(u =>
-    u.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const TABS = [
-    { id: 'roles', label: 'Roles & Permissions', icon: Shield },
-    { id: 'groups', label: 'Groups & Departments', icon: FolderTree },
-    { id: 'users', label: 'User Provisioning', icon: Users },
-  ];
-
-  if (loading) return (
-    <div className="flex items-center justify-center h-full text-slate-500 text-sm gap-3">
-      <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-400 rounded-full animate-spin" />
-      Synchronising security schema…
-    </div>
-  );
-
-  return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-slate-800/60 pb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-            <Shield size={18} className="text-violet-400" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white">Access Management</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Dynamic RBAC — HSA CLS-MD Level 2 Compliant</p>
-          </div>
-        </div>
-      </header>
-
-      {/* Tabs */}
-      <div className="flex gap-1 bg-slate-900/50 border border-slate-800/60 rounded-xl p-1 w-fit">
-        {TABS.map(tab => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                active
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <Icon size={14} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── ROLES & PERMISSIONS TAB ── */}
-      {activeTab === 'roles' && (
-        <div className="grid grid-cols-12 gap-5">
-          {/* Role list */}
-          <div className="col-span-3 space-y-2">
-            <div className="flex items-center justify-between mb-1 px-1">
-              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Roles</span>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
-              >
-                <Plus size={11} /> New
-              </button>
-            </div>
-
-            {roles.map(r => (
-              <button
-                key={r.id}
-                onClick={() => setSelectedRole(r)}
-                className={`w-full text-left p-3 rounded-xl border transition-all ${
-                  selectedRole?.id === r.id
-                    ? 'bg-violet-500/10 border-violet-500/25 text-violet-300'
-                    : 'border-slate-800/60 hover:border-slate-700 bg-[#0c1220] text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-sm">{r.name}</span>
-                  <div className="flex items-center gap-1.5">
-                    {r.isSystemRole && <Lock size={10} className="text-amber-500 opacity-60" title="System Role — locked" />}
-                    <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded">
-                      {r.permissions?.length ?? 0}
-                    </span>
-                  </div>
-                </div>
-                {r.description && (
-                  <p className="text-[10px] text-slate-600 mt-0.5 line-clamp-1">{r.description}</p>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Permissions matrix */}
-          <div className="col-span-9 bg-[#0c1220] border border-slate-800/60 rounded-2xl p-6">
-            {selectedRole ? (
-              <>
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <h3 className="font-bold text-white">{selectedRole.name}</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {selectedRole.permissions?.length ?? 0} active permissions
-                      {selectedRole.isSystemRole && ' · System role — read only'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Group by resource */}
-                {Object.entries(
-                  permissions.reduce((acc, p) => {
-                    if (!acc[p.resource]) acc[p.resource] = [];
-                    acc[p.resource].push(p);
-                    return acc;
-                  }, {})
-                ).map(([resource, perms]) => (
-                  <div key={resource} className="mb-5">
-                    <div className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-2 px-1">
-                      {resource}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {perms.map(p => {
-                        const has = selectedRole.permissions?.some(rp => rp.id === p.id);
-                        return (
-                          <div
-                            key={p.id}
-                            onClick={() => togglePermission(selectedRole.id, p.id)}
-                            className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
-                              has
-                                ? 'bg-emerald-500/8 border-emerald-500/25 text-emerald-300'
-                                : 'border-slate-800/60 text-slate-500 hover:border-slate-700'
-                            } ${selectedRole.isSystemRole ? 'cursor-not-allowed opacity-60' : ''}`}
-                          >
-                            <div>
-                              <div className="text-xs font-mono font-bold">{p.resource}:{p.action}</div>
-                              <div className="text-[10px] text-slate-500 mt-0.5">{p.description}</div>
-                            </div>
-                            <div className={`w-9 h-5 rounded-full flex items-center px-0.5 transition-all ${has ? 'bg-emerald-500 justify-end' : 'bg-slate-700 justify-start'}`}>
-                              <div className="w-4 h-4 bg-white rounded-full shadow" />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </>
-            ) : (
-              <p className="text-slate-600 text-sm">Select a role to configure permissions.</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── GROUPS TAB ── */}
-      {activeTab === 'groups' && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">Groups enforce RLS boundaries. Members inherit all role permissions assigned to their group.</p>
-            <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-bold text-white flex items-center gap-2 transition-colors">
-              <Plus size={12} /> New Group
-            </button>
-          </div>
-
-          {/* Groups table */}
-          <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-800/60 text-slate-500 text-xs">
-                  <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider">Group Name</th>
-                  <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider">Department</th>
-                  <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider">Inherited Roles</th>
-                  <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider">Members</th>
-                  <th className="text-right px-5 py-3 font-semibold uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map((g, i) => (
-                  <tr key={g.id} className={`border-b border-slate-800/40 text-slate-300 hover:bg-slate-800/20 transition-colors ${i === groups.length - 1 ? 'border-b-0' : ''}`}>
-                    <td className="px-5 py-4">
-                      <div className="font-semibold text-white">{g.name}</div>
-                      <div className="text-[10px] text-slate-600 mt-0.5">{g.description}</div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="inline-flex items-center gap-1 text-xs bg-slate-800 px-2 py-1 rounded-lg text-slate-400">
-                        <Building2 size={10} /> {g.dept}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex gap-1 flex-wrap">
-                        {g.roles.map(r => (
-                          <span key={r} className="text-[10px] bg-violet-500/10 text-violet-400 border border-violet-500/20 px-1.5 py-0.5 rounded-md font-medium">
-                            {r}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="text-xs text-slate-400">{g.memberCount} members</span>
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg transition-all"><Edit2 size={13} /></button>
-                        <button className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={13} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── USERS TAB ── */}
-      {activeTab === 'users' && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="relative">
-              <Search size={13} className="absolute left-3 top-2.5 text-slate-500" />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search users..."
-                className="bg-[#0c1220] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 focus:border-violet-500 outline-none w-64 transition-colors"
-              />
-            </div>
-            <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-bold text-white flex items-center gap-2 transition-colors">
-              <UserPlus size={12} /> Provision User
-            </button>
-          </div>
-
-          <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-800/60 text-slate-500 text-xs">
-                  <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider">Clinician</th>
-                  <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider">Role</th>
-                  <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider">Department</th>
-                  <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider">Status</th>
-                  <th className="text-right px-5 py-3 font-semibold uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map((u, i) => (
-                  <tr key={u.id} className={`border-b border-slate-800/40 text-slate-300 hover:bg-slate-800/20 transition-colors ${i === filteredUsers.length - 1 ? 'border-b-0' : ''}`}>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-200 uppercase shrink-0">
-                          {u.fullName?.[0] || '?'}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-white text-sm">{u.fullName}</div>
-                          <div className="text-[10px] text-slate-500">{u.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={`text-xs font-semibold px-2 py-1 rounded-lg border ${
-                        u.role === 'admin' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                        : u.role === 'doctor' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      }`}>
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-slate-400 text-xs">{u.dept || '—'}</td>
-                    <td className="px-5 py-4">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${
-                        u.isActive !== false
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : 'bg-slate-700 text-slate-500'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${u.isActive !== false ? 'bg-emerald-400' : 'bg-slate-500'}`} />
-                        {u.isActive !== false ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg transition-all"><Edit2 size={13} /></button>
-                        <button className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={13} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredUsers.length === 0 && (
-                  <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-600 text-sm">No users match your search.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Create Role Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-[#0c1220] border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-bold text-white">Define New Clinical Role</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-white transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleCreateRole} className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Role Name</label>
-                <input
-                  required
-                  type="text"
-                  value={newRole.name}
-                  onChange={e => setNewRole({ ...newRole, name: e.target.value })}
-                  className="w-full mt-1.5 bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 focus:border-violet-500 outline-none transition-colors"
-                  placeholder="e.g. Senior Charge Nurse"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Description</label>
-                <textarea
-                  value={newRole.description}
-                  onChange={e => setNewRole({ ...newRole, description: e.target.value })}
-                  className="w-full mt-1.5 bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 focus:border-violet-500 outline-none h-20 transition-colors resize-none"
-                  placeholder="Clinical responsibilities and scope..."
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-semibold transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-sm font-semibold transition-colors">Register Role</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function PatientRecordsPage({ backendUrl, initialContext, onClearContext }) {
   const [admissions, setAdmissions] = useState([]);
@@ -1308,28 +1002,4 @@ function PatientRecordsPage({ backendUrl, initialContext, onClearContext }) {
     </div>
   );
 }
-
-// ─── MOCK DATA FOR ACCESS MANAGEMENT ──────────────────────────────────────────
-const MOCK_ROLES = [
-  { id: 'admin', name: 'Administrator', description: 'Full system access and security management', isSystemRole: true, permissions: [] },
-  { id: 'doctor', name: 'Medical Officer', description: 'Full clinical access and patient management', isSystemRole: false, permissions: [] },
-  { id: 'nurse', name: 'Registered Nurse', description: 'Patient monitoring and bedside care', isSystemRole: false, permissions: [] },
-];
-
-const MOCK_PERMISSIONS = [
-  { id: '1', resource: 'Patients', action: 'View', description: 'Access patient records' },
-  { id: '2', resource: 'Patients', action: 'Edit', description: 'Modify patient information' },
-  { id: '3', resource: 'Devices', action: 'Monitor', description: 'View live telemetry' },
-  { id: '4', resource: 'System', action: 'Configure', description: 'Change system settings' },
-];
-
-const MOCK_USERS = [
-  { id: '1', fullName: 'Dr. Sarah Lim', email: 'sarah.lim@medmonitor.local', role: 'doctor', dept: 'ICU', isActive: true },
-  { id: '2', fullName: 'Nurse John Doe', email: 'john.doe@medmonitor.local', role: 'nurse', dept: 'ICU', isActive: true },
-  { id: '3', fullName: 'Admin User', email: 'admin@medmonitor.local', role: 'admin', dept: 'IT', isActive: true },
-];
-
-const MOCK_GROUPS = [
-  { id: 'g1', name: 'ICU Team A', description: 'Intensive Care Unit - Morning Shift', dept: 'ICU', roles: ['doctor', 'nurse'], memberCount: 12 },
-  { id: 'g2', name: 'Pediatrics B', description: 'Pediatrics Ward - Night Shift', dept: 'Pediatrics', roles: ['nurse'], memberCount: 8 },
-];
+

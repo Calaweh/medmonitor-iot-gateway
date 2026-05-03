@@ -129,12 +129,12 @@ public class AuthController : ControllerBase
 
         var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim(ClaimTypes.Role, user.Role),
             new Claim("FullName", user.FullName),
-            // Ensure the Database RLS context is baked into the immutable token
-            new Claim("DepartmentId", user.DepartmentId?.ToString() ?? "")
+            new Claim("DepartmentId", user.DepartmentId?.ToString() ?? ""),
+            new Claim("TokenVersion", user.TokenVersion.ToString())
         };
 
         // Bridge legacy string roles to the new dynamic RBAC schema

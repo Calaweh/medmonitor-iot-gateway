@@ -34,6 +34,12 @@ public class Alert
     [Column("resolved_at")]
     public DateTime? ResolvedAt { get; set; }
 
+    [Column("acknowledged_at")]
+    public DateTime? AcknowledgedAt { get; set; }
+
+    [Column("acknowledged_by")]
+    public Guid? AcknowledgedBy { get; set; }
+
     // Navigation properties
     public Device? Device { get; set; }
     public SensorReading? Reading { get; set; }
