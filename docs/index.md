@@ -71,7 +71,8 @@ Hospital IT architects and researchers frequently encounter the same roadblocks 
 
 MedMonitor uses a modern, decoupled architecture designed for high-throughput sensor telemetry.
 
-```mermaid
+```html
+<div class="mermaid">
 graph TD
     subgraph Edge["MIC@Home / Ward Edge"]
         D1[Patient Sensor 1] -->|Raw Vitals| Sim[Edge Buffer Gateway]
@@ -94,6 +95,7 @@ graph TD
         SigR -- "Real-time Telemetry" --> UI[Clinical Dashboard]
         UI -- "JWT Authentication" --> API
     end
+</div>
 ```
 
 ---
