@@ -5,34 +5,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     {% seo %}
     <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+    
     <style>
-      /* Fix for Mermaid diagrams looking too small or squished */
-      .mermaid { 
-        background: white; 
-        padding: 20px; 
-        border-radius: 10px; 
-        margin: 20px 0;
-        overflow-x: auto;
+      /* 1. Make the page wider for technical content */
+      .wrapper { 
+        max-width: 1000px !important; 
+        margin: 0 auto !important; 
+        padding: 40px !important; 
       }
-      /* Hide the default theme header if it still appears */
+
+      /* 2. Hide the annoying blue repository header */
       header { display: none !important; }
-      .wrapper { max-width: 900px !important; }
+
+      /* 3. FIX THE TABLES (Borders, Padding, Width) */
+      table { 
+        display: table !important;
+        width: 100% !important; 
+        border-collapse: collapse !important; 
+        margin: 25px 0 !important;
+        font-size: 0.9em !important;
+        min-width: 400px !important;
+        border-radius: 5px 5px 0 0 !important;
+        overflow: hidden !important;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.05) !important;
+      }
+      table th {
+        background-color: #009879 !important;
+        color: #ffffff !important;
+        text-align: left !important;
+        font-weight: bold !important;
+        padding: 12px 15px !important;
+      }
+      table td {
+        padding: 12px 15px !important;
+        border-bottom: 1px solid #dddddd !important;
+      }
+      table tr:nth-of-type(even) { background-color: #f3f3f3 !important; }
+
+      /* 4. Fix Mermaid Diagram */
+      .mermaid { 
+        background: white !important; 
+        padding: 20px !important; 
+        border: 1px solid #eee !important;
+        border-radius: 10px !important;
+        margin: 20px 0 !important;
+        overflow-x: auto !important;
+      }
+
+      /* 5. Improve Code Block visibility */
+      pre { 
+        background: #282c34 !important; 
+        color: #abb2bf !important; 
+        padding: 15px !important; 
+        border-radius: 8px !important; 
+      }
     </style>
   </head>
   <body>
     <div class="wrapper">
-      <!-- We removed the <header> block from here -->
       <section>
         {{ content }}
       </section>
     </div>
     
-    <!-- Mermaid.js Logic -->
+    <!-- Mermaid script -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script>
       mermaid.initialize({ 
         startOnLoad: true, 
-        theme: 'default',
+        theme: 'neutral',
         securityLevel: 'loose'
       });
     </script>
