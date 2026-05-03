@@ -134,11 +134,10 @@ public class InteroperabilityController : ControllerBase
                     if (fields.Length > 2) deviceCode = fields[2];
                     
                     // Timestamp extracted from MSH-7
-                    if (fields.Length > 6
-                        && fields[6].Length >= 14
-                        && DateTime.TryParseExact(fields[6].Substring(0, 14), "yyyyMMddHHmmss", null, System.Globalization.DateTimeStyles.None, out var dt))
+                    if (fields.Length > 6 && fields[6].Length >= 14)
                     {
-                        recordedAt = dt;
+                        if (DateTime.TryParseExact(fields[6].Substring(0, 14), "yyyyMMddHHmmss", null, System.Globalization.DateTimeStyles.None, out var dt))
+                            recordedAt = dt;
                     }
                 }
                 // Observation Result Segment

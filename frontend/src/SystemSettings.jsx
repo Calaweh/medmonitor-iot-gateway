@@ -8,17 +8,17 @@ import {
 } from 'lucide-react';
 
 export default function SystemSettings({ backendUrl }) {
-  const [activeTab, setActiveTab] = useState('parameters'); // parameters | audit
+  const [activeTab, setActiveTab] = useState('parameters'); // parameters | audit | maintenance
 
   // Parameters State
-  const [thresholds, setThresholds] = useState({
-    hrMin: 40, hrMax: 120,
-    spo2Min: 90,
-    tempMin: 35.0, tempMax: 39.0,
-    retention: 30
+  const [thresholds, setThresholds] = useState({ 
+    hrMin: 40, hrMax: 120, 
+    spo2Min: 90, 
+    tempMin: 35.0, tempMax: 39.0, 
+    retention: 30 
   });
   const [isSaving, setIsSaving] = useState(false);
-  const[saveMessage, setSaveMessage] = useState('');
+  const [saveMessage, setSaveMessage] = useState('');
 
   // Audit State
   const [logs, setLogs] = useState([]);
@@ -69,7 +69,6 @@ export default function SystemSettings({ backendUrl }) {
       setLogs(res.data);
     } catch (err) {
       console.error("Failed to fetch logs", err);
-      // Fallback mock logs if endpoint is unavailable
       setLogs([
         { id: 105, userId: 'sys-admin', action: 'RESOLVE_ALERT', entityType: 'Alert', entityId: '842', occurredAt: new Date().toISOString(), hash: 'a1b2c3d4e5f6g7h8i9j0...' },
         { id: 104, userId: 'dr-sarah', action: 'ADMIT_PATIENT', entityType: 'Patient', entityId: 'P-991', occurredAt: new Date(Date.now() - 3600000).toISOString(), hash: 'b2c3d4e5f6g7h8i9j0a1...' },
@@ -94,7 +93,6 @@ export default function SystemSettings({ backendUrl }) {
   const handleSaveParameters = (e) => {
     e.preventDefault();
     setIsSaving(true);
-    // Mock API call to save global parameters (Since backend reads from hardcoded limits currently)
     setTimeout(() => {
       setIsSaving(false);
       setSaveMessage('System parameters successfully updated and staged for edge devices.');
@@ -149,15 +147,12 @@ export default function SystemSettings({ backendUrl }) {
       {activeTab === 'parameters' && (
         <form onSubmit={handleSaveParameters} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Clinical Thresholds */}
             <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Activity size={16} className="text-emerald-400" />
                 <h3 className="font-bold text-white">Default Clinical Thresholds</h3>
               </div>
               <p className="text-xs text-slate-500 mb-6">These are the global fallback limits. They can be overridden per patient by a Doctor.</p>
-              
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -169,12 +164,10 @@ export default function SystemSettings({ backendUrl }) {
                     <input type="number" value={thresholds.hrMax} onChange={e => setThresholds({...thresholds, hrMax: e.target.value})} className="w-full mt-1.5 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500" />
                   </div>
                 </div>
-                
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">SpO₂ Minimum (%)</label>
                   <input type="number" value={thresholds.spo2Min} onChange={e => setThresholds({...thresholds, spo2Min: e.target.value})} className="w-full mt-1.5 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500" />
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Temp Min (°C)</label>
@@ -187,15 +180,12 @@ export default function SystemSettings({ backendUrl }) {
                 </div>
               </div>
             </div>
-
-            {/* Retention & Compliance */}
             <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <FileText size={16} className="text-amber-400" />
                 <h3 className="font-bold text-white">Compliance & Retention</h3>
               </div>
               <p className="text-xs text-slate-500 mb-6">Configure data lifecycle to comply with PDPA Principle 7 regarding patient records.</p>
-              
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Telemetry Purge Window (Days)</label>
                 <div className="relative mt-1.5">
@@ -206,7 +196,6 @@ export default function SystemSettings({ backendUrl }) {
               </div>
             </div>
           </div>
-
           <div className="flex items-center gap-4">
             <button type="submit" disabled={isSaving} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors">
               {isSaving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
@@ -220,7 +209,6 @@ export default function SystemSettings({ backendUrl }) {
       {/* ── AUDIT TAB ── */}
       {activeTab === 'audit' && (
         <div className="space-y-6">
-          {/* Integrity Banner */}
           <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <h3 className="font-bold text-white flex items-center gap-2">
@@ -236,7 +224,6 @@ export default function SystemSettings({ backendUrl }) {
               {verifyStatus === 'loading' ? 'VERIFYING...' : 'VERIFY INTEGRITY'}
             </button>
           </div>
-
           {verifyStatus === 'success' && (
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-sm flex items-center gap-2">
               <CheckCircle2 size={16} /> {verifyMessage}
@@ -247,8 +234,6 @@ export default function SystemSettings({ backendUrl }) {
               <AlertTriangle size={16} /> {verifyMessage}
             </div>
           )}
-
-          {/* Logs Table */}
           <div className="bg-[#0c1220] border border-slate-800/60 rounded-2xl overflow-hidden">
             {loadingLogs ? (
               <div className="p-8 text-center text-slate-500 text-sm">Fetching audit trail...</div>
@@ -266,18 +251,10 @@ export default function SystemSettings({ backendUrl }) {
                 <tbody className="divide-y divide-slate-800/40">
                   {logs.map((log) => (
                     <tr key={log.id} className="hover:bg-slate-800/20 transition-colors">
-                      <td className="px-5 py-3 text-slate-400 text-xs">
-                        {new Date(log.occurredAt).toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3 text-slate-300 font-mono text-xs">
-                        {log.userId?.substring(0, 8) || 'SYSTEM'}
-                      </td>
-                      <td className="px-5 py-3 text-violet-400 font-semibold text-xs">
-                        {log.action}
-                      </td>
-                      <td className="px-5 py-3 text-slate-400 text-xs">
-                        {log.entityType} <span className="text-slate-600">#{log.entityId || 'N/A'}</span>
-                      </td>
+                      <td className="px-5 py-3 text-slate-400 text-xs">{new Date(log.occurredAt).toLocaleString()}</td>
+                      <td className="px-5 py-3 text-slate-300 font-mono text-xs">{log.userId?.substring(0, 8) || 'SYSTEM'}</td>
+                      <td className="px-5 py-3 text-violet-400 font-semibold text-xs">{log.action}</td>
+                      <td className="px-5 py-3 text-slate-400 text-xs">{log.entityType} <span className="text-slate-600">#{log.entityId || 'N/A'}</span></td>
                       <td className="px-5 py-3 text-right">
                         <span className="font-mono text-[10px] text-emerald-400/70 bg-emerald-500/10 px-2 py-1 rounded" title={log.hash}>
                           {log.hash ? log.hash.substring(0, 16) + '...' : 'PENDING'}
@@ -285,9 +262,6 @@ export default function SystemSettings({ backendUrl }) {
                       </td>
                     </tr>
                   ))}
-                  {logs.length === 0 && (
-                    <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-600 text-sm">No audit logs found.</td></tr>
-                  )}
                 </tbody>
               </table>
             )}

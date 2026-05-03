@@ -36,4 +36,7 @@ public class Device
 
     [Column("certificate_thumbprint")] 
     public string? CertificateThumbprint { get; set; }
+
+    [ForeignKey("DepartmentId")]
+    public Department? DepartmentNav { get; set; }
 }

@@ -42,8 +42,8 @@ Log.Logger = new LoggerConfiguration()
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
-builder.Configuration.AddEnvironmentVariables();
 
+builder.Configuration.AddEnvironmentVariables();
 var connectionString = Environment.GetEnvironmentVariable("SUPABASE_CONN_STRING")
                        ?? builder.Configuration.GetConnectionString("Supabase");
 
@@ -52,7 +52,6 @@ if (string.IsNullOrEmpty(connectionString))
         "SUPABASE_CONN_STRING environment variable or configuration is missing. Check your .env.local file.");
 
 // ─── Scalable Security Registration ──────────────────────────────────────────
-// Required for the TenantInterceptor to access the current user's claims
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<TenantInterceptor>();
 
@@ -61,11 +60,8 @@ builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
         npgsqlOptions.EnableRetryOnFailure(3);
-        // Important for Port 6543:
         npgsqlOptions.CommandTimeout(30); 
     });
-    
-    // Use the Service Provider to get the scoped interceptor
     options.AddInterceptors(serviceProvider.GetRequiredService<TenantInterceptor>());
 });
 
@@ -76,7 +72,7 @@ builder.Services.AddHealthChecks()
         failureStatus: HealthStatus.Unhealthy,
         tags: new[] { "db", "ready" });
 
-// ─── JWT Authentication ─────────────────────────────────────────────────────
+// ─── JWT Authentication & Validation ────────────────────────────────────────
 var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
                 ?? builder.Configuration["Jwt:Secret"]
                 ?? "FallbackSecretKeyThatIsAtLeast32BytesLong!";
@@ -92,6 +88,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = false,
             ClockSkew = TimeSpan.Zero
         };
+        
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
@@ -101,6 +98,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/vitalsigns"))
                     context.Token = accessToken;
                 return Task.CompletedTask;
+            },
+            
+            // --- HSA CLS-MD LEVEL 2: TOKEN REVOCATION CHECK ---
+            OnTokenValidated = async context =>
+            {
+                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var userIdString = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var tokenVersionString = context.Principal?.FindFirst("TokenVersion")?.Value;
+
+                if (Guid.TryParse(userIdString, out var userId) && int.TryParse(tokenVersionString, out var tokenVersion))
+                {
+                    // Verify the JWT token version matches the DB. If lower, the token was revoked due to permission change
+                    var userVersion = await db.Users.Where(u => u.Id == userId).Select(u => u.TokenVersion).FirstOrDefaultAsync();
+                    if (userVersion != tokenVersion)
+                    {
+                        context.Fail("Security context expired. Token has been revoked due to a permission or role modification.");
+                    }
+                }
             }
         };
     });
@@ -120,7 +135,6 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 
-// ─── Swagger with GEO/SEO XML Documentation ──────────────────────────────────
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
@@ -129,12 +143,11 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v2.1",
         Description = "Medical Device Monitoring System — IEC 62304 Class B. Enterprise Scale Edition."
     });
-
-    // Integrate XML Comments into Swagger for AI and Developer GEO
+    
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath);
-
+    
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization. Enter your token below. Example: \"Bearer eyJ...\"",
@@ -144,7 +157,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "bearer",
         BearerFormat = "JWT"
     });
-
+    
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -160,6 +173,7 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped(typeof(ReadingService));
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<MedicationService>();
+
 var isDevelopment = builder.Environment.IsDevelopment();
 
 builder.Services.AddHangfire(config =>
@@ -174,7 +188,9 @@ builder.Services.AddHangfireServer(options =>
     options.SchedulePollingInterval = TimeSpan.FromMinutes(1);
     options.CancellationCheckInterval = TimeSpan.FromMinutes(2);
 });
+
 builder.Services.AddScoped<RetentionService>();
+builder.Services.AddScoped<AlertEscalationService>();
 builder.Services.AddScoped<AlertEscalationService>();
 
 var app = builder.Build();
@@ -236,19 +252,21 @@ using (var scope = app.Services.CreateScope())
             "purge-old-readings", 
             svc => svc.PurgeOldReadingsAsync(), 
             "0 2 * * *");
+            
         recurringJobManager.AddOrUpdate<MedicationService>(
             "check-missed-meds", 
             svc => svc.CheckOverdueMedicationsAsync(), 
             "*/15 * * * *");
+            
         recurringJobManager.AddOrUpdate<AlertEscalationService>(
             "escalate-unresolved-alerts", 
             svc => svc.EscalateAlertsAsync(), 
-            "*/5 * * * *"); // Run every 5 minutes
+            "*/5 * * * *"); 
+            
         logger.LogInformation("Hangfire recurring jobs registered successfully.");
     }
     catch (Exception ex)
     {
-        // Log but don't crash — Hangfire will re-register jobs on next server heartbeat
         logger.LogWarning(ex, 
             "Hangfire job registration failed at startup (Supabase may be waking up). " +
             "Jobs will self-register on next Hangfire server heartbeat.");

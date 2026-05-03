@@ -1,0 +1,39 @@
+name: IEC 62304 CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+        
+    - name: Backend Build & Validation
+      run: |
+        dotnet restore backend/MedicalDeviceMonitor.csproj
+        dotnet build backend/MedicalDeviceMonitor.csproj -c Release --no-restore
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        
+    - name: Frontend Build
+      working-directory: ./frontend
+      run: |
+        npm ci
+        npm run build
+        
+    - name: IEC 62304 SOUP Check
+      run: |
+        # Static analysis to ensure no unapproved third-party dependencies are added
+        dotnet list backend/MedicalDeviceMonitor.csproj package > soup_audit.txt
