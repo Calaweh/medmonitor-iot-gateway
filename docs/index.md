@@ -71,7 +71,6 @@ Hospital IT architects and researchers frequently encounter the same roadblocks 
 
 MedMonitor uses a modern, decoupled architecture designed for high-throughput sensor telemetry.
 
-```html
 <div class="mermaid">
 graph TD
     subgraph Edge["MIC@Home / Ward Edge"]
@@ -79,24 +78,22 @@ graph TD
         D2[Patient Sensor 2] -->|Raw Vitals| Sim
         Sim -- "REST (JSON) + X-Api-Key" --> API
     end
-
     subgraph Backend [".NET 8 Application Server"]
         API[Ingestion API] --> RS[Reading Service / MEWS Logic]
         RS --> |Save| ORM[EF Core]
         RS --> |Broadcast| SigR[SignalR WebSocket Hub]
     end
-
+ 
     subgraph Database ["PostgreSQL (Supabase/AWS)"]
         ORM -- "Session Pooling (5432) + RLS" --> DB[(PostgreSQL)]
         DB --> Aud[HMAC-SHA256 Audit Log]
     end
-
+ 
     subgraph Frontend["React 19 SPA"]
         SigR -- "Real-time Telemetry" --> UI[Clinical Dashboard]
         UI -- "JWT Authentication" --> API
     end
 </div>
-```
 
 ---
 
