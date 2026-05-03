@@ -7,11 +7,12 @@ backend/logs/
 backup/
 
 # ─── .NET / C# ──────────────────────────────────────────────
-backend/bin/
-backend/obj/
-backend/*.user
-backend/.vs/
-backend/**/*.user
+bin/
+obj/
+*.user
+.vs/
+**/bin/
+**/obj/
 
 # ─── Node / Frontend ────────────────────────────────────────
 frontend/node_modules/
@@ -75,4 +76,4 @@ repomix-output.xml
 repomix.config.json
 repomix-instruction.md
 .claude
-.cache
+*.cache
