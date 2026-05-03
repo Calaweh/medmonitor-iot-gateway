@@ -1,0 +1,33 @@
+title: MedMonitor - Open-Source Medical IoT Gateway
+description: Pre-compliant Medical IoT Gateway for MIC@Home and hospital step-down wards in ASEAN
+keywords: medical iot, health monitoring, iot gateway, opensource
+
+url: "https://calaweh.github.io"
+baseurl: "/medmonitor-iot-gateway"
+
+theme: jekyll-theme-minimal
+
+plugins:
+  - jekyll-seo-tag
+
+markdown: kramdown
+highlighter: rouge
+
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+exclude:
+  - README.md
+  - "*.gemspec"
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - docker
+  - frontend
+  - supabase
+  - docker-compose.yml
+  - package.json
+  - package-lock.json
+  - .env.example
