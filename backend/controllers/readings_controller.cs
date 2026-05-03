@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Text.Json;
+
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace MedicalDeviceMonitor.Controllers;
 
@@ -24,9 +27,17 @@ public class ReadingsController : ControllerBase
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("ingest")]
     [HttpPost("ingest")]
     public async Task<IActionResult> IngestData([FromBody] IngestReadingDto dto)
     {
+        // Basic DoS Protection
+        if (Request.ContentLength > 50000) // 50KB limit for vitals
+            return StatusCode(413, "Payload too large");
+
+        if (dto.Payload.ValueKind != JsonValueKind.Object)
+            return BadRequest("Invalid payload format");
+            
         // 1. Extract the per-device API key from the headers
         var apiKey = Request.Headers["X-Device-Api-Key"].FirstOrDefault();
         if (string.IsNullOrEmpty(apiKey))

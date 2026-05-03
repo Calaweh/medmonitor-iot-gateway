@@ -28,10 +28,9 @@ services:
       - Jwt__Issuer=${JWT_ISSUER}
       - Jwt__Audience=${JWT_AUDIENCE}
       - LOKI_URL=${LOKI_URL_INTERNAL}
+      - AUDIT_HMAC_SECRET=${AUDIT_HMAC_SECRET:-FallbackAuditSecretKey123!@#}
     expose:
       - "5000"
-    ports:
-      - "5000:5000"
     restart: unless-stopped
 
   # ─── React 19 + Vite (production build) ────────────────────

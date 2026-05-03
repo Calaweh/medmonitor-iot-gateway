@@ -37,6 +37,12 @@ public class Device
     [Column("certificate_thumbprint")] 
     public string? CertificateThumbprint { get; set; }
 
+    [Column("department_id")]
+    public Guid? DepartmentId { get; set; }
+
     [ForeignKey("DepartmentId")]
     public Department? DepartmentNav { get; set; }
+
+    [Column("last_seen_at")]
+    public DateTime? LastSeenAt { get; set; }
 }

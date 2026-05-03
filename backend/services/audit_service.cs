@@ -11,6 +11,7 @@ namespace MedicalDeviceMonitor.Services;
 public class AuditService
 {
     private readonly AppDbContext _db;
+    private const long AuditChainLockId = 0x4D45444D4F4E; // "MEDMON"
     private readonly string _hmacKey;
     private readonly ILogger<AuditService> _logger;
 
@@ -18,9 +19,10 @@ public class AuditService
     {
         _db = db;
         _logger = logger;
+        // P0: Throw on missing secret to prevent silent security degradation
         _hmacKey = Environment.GetEnvironmentVariable("AUDIT_HMAC_SECRET") 
             ?? config["Audit:HmacSecret"] 
-            ?? "FallbackAuditSecretKey123!@#";
+            ?? throw new InvalidOperationException("CRITICAL: AUDIT_HMAC_SECRET is not configured.");
     }
 
     public async Task LogActionAsync(Guid? userId, string action, string entityType, string entityId, object? detail = null)
@@ -56,8 +58,8 @@ public class AuditService
 
     private async Task ExecuteAuditLogicAsync(Guid? userId, string action, string entityType, string entityId, object? detail)
     {
-        // Lock table to prevent race conditions during hash chain calculation
-        await _db.Database.ExecuteSqlRawAsync("LOCK TABLE audit_log IN EXCLUSIVE MODE;");
+        // Use named advisory lock instead of table lock
+        await _db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock({0});", AuditChainLockId);
 
         var lastLog = await _db.AuditLogs
             .OrderByDescending(a => a.Id)

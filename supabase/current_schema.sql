@@ -2,6 +2,7 @@
 -- FINAL DATABASE SCHEMA (after all migrations up to 20260504000000)
 -- Includes: devices + department RBAC, clinical tables, audit hash chain,
 --           strict access control, audit immutability, and mutual TLS support
+-- NOTE: View only script
 -- =============================================================================
 
 -- ============================================================

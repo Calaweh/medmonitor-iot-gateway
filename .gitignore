@@ -75,3 +75,4 @@ repomix-output.xml
 repomix.config.json
 repomix-instruction.md
 .claude
+.cache

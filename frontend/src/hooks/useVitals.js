@@ -51,6 +51,14 @@ export const useVitals = (backendUrl, deviceCode, token) => {
       }
     });
 
+    connection.on("AlertAcknowledged", (data) => {
+      setAlerts((prev) => prev.map(a => a.id === data.id ? { ...a, acknowledgedAt: data.acknowledgedAt } : a));
+    });
+
+    connection.on("AlertResolved", (alertId) => {
+      setAlerts((prev) => prev.filter(a => a.id !== alertId));
+    });
+
     connection.start().catch(console.error);
 
     return () => connection.stop();

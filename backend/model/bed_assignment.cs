@@ -12,6 +12,8 @@ public class BedAssignment
     [Column("admitted_at")] public DateTime AdmittedAt { get; set; } = DateTime.UtcNow;
     [Column("discharged_at")] public DateTime? DischargedAt { get; set; }
     [Column("diagnosis")] public string? Diagnosis { get; set; }
+    [Column("attending_physician")] public string? AttendingPhysician { get; set; }
+    [Column("admission_type")] public string? AdmissionType { get; set; }
     
     public Patient? Patient { get; set; }
     public Device? Device { get; set; }

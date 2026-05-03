@@ -72,6 +72,9 @@ public class ReadingService
             .OrderByDescending(r => r.RecordedAt)
             .FirstOrDefaultAsync();
 
+        // 3. Heartbeat: Update last_seen_at
+        device.LastSeenAt = DateTime.UtcNow;
+
         // 2. Resolve current patient (for per-patient thresholds)
         var currentAssignment = await _db.BedAssignments
             .Where(b => b.DeviceId == device.Id && b.DischargedAt == null)
@@ -89,11 +92,17 @@ public class ReadingService
         }
         
         // 4. Save new reading
+        int mewsScore = CalculateMews(dto.Payload);
+        
+        // PERSISTENCE: Save MEWS score into the JSONB payload for historical trend analysis
+        var extendedPayload = JsonSerializer.Deserialize<Dictionary<string, object>>(dto.Payload.GetRawText()) ?? new();
+        extendedPayload["mews_score"] = mewsScore;
+
         var reading = new SensorReading
         {
             DeviceId = device.Id,
             RecordedAt = dto.RecordedAt.ToUniversalTime(),
-            Payload = JsonDocument.Parse(dto.Payload.GetRawText())
+            Payload = JsonDocument.Parse(JsonSerializer.Serialize(extendedPayload))
         };
         _db.SensorReadings.Add(reading);
         
@@ -157,7 +166,7 @@ public class ReadingService
         }
 
         // ── Rule E: MEWS Composite Score ──────────────────────────────────
-        int mewsScore = CalculateMews(dto.Payload);
+        // Note: mewsScore was calculated earlier for persistence
         if (mewsScore >= 4 && !recentAlertTypes.Contains("HIGH_MEWS_SCORE"))
         {
             activeAlertsToSave.Add(CreateAlert(device.Id, reading, "HIGH_MEWS_SCORE", "CRITICAL",
@@ -288,6 +297,14 @@ public class ReadingService
         {
             if (temp < 35.0) score += 2;
             else if (temp >= 38.5) score += 2;
+        }
+
+        // 5. AVPU (Consciousness) - Subbe et al. Requirement
+        // Since sensors don't provide consciousness, we default to 0 (Alert)
+        // In a production environment, this would be fetched from the latest Nursing Assessment.
+        bool hasConsciousness = payload.TryGetProperty("avpu", out var avpu);
+        if (hasConsciousness) {
+            score += avpu.GetString() switch { "V" => 1, "P" => 2, "U" => 3, _ => 0 };
         }
 
         return score;

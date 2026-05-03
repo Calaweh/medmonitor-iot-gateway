@@ -63,3 +63,31 @@ This document records critical errors encountered during the development of the 
     - **Csproj:** Added `Hangfire.AspNetCore` and `Hangfire.PostgreSql` to `MedicalDeviceMonitor.csproj`.
     - **DI-Aware Jobs:** Replaced static `RecurringJob` calls with `IRecurringJobManager` resolved from an `IServiceScope` after `app.Build()`.
     - **Cleanup:** Fixed a duplicate `userIdString` declaration in `AlertsController` and removed a broken "TenantId" query filter workaround in `AppDbContext`.
+
+## 11. Database Schema Mismatch (400/500 Errors)
+- **Symptom:** `GET /api/alerts 500 (Internal Server Error)` and `GET /api/readings/.../history 400 (Bad Request)`. Backend logs showed `Npgsql.PostgresException: 42703: column d.department_id does not exist`.
+- **Why:** The C# models were updated to use new RBAC columns (like `department_id`), but the actual Supabase database was still using the old schema. Running `CREATE TABLE IF NOT EXISTS` in `current_schema.sql` failed to add the new columns because the tables already existed.
+- **Solution:** 
+    - Implemented an **idempotent startup hotfix** in `Program.cs` using `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
+    - Added an automated seed step to ensure a default "ICU" department exists and that all legacy devices are assigned to it to prevent RLS/Foreign Key constraint failures.
+    - Updated `AuthController` and `Program.cs` to use `ClaimTypes.NameIdentifier` for better compatibility with standard JWT claim mapping.
+
+## 12. Ghost Function Build Failure (CS0103)
+- **Symptom:** `error CS0103: The name 'VerifyDeviceSignature' does not exist in the current context`.
+- **Why:** A trailing call to a non-existent method was accidentally left in `ReadingService.cs` during a refactor. This blocked the Docker build pipeline.
+- **Solution:** Removed the non-existent call and associated comments. Hardened verification logic remains in the `ReadingsController` via API Key checks.
+
+## 13. JWT Validation Type Mismatch (InvalidCastException)
+- **Symptom:** `System.InvalidCastException: Reading as 'System.Int32' is not supported for fields having DataTypeName 'text'`.
+- **Why:** The `token_version` column in PostgreSQL was created as `TEXT` or `VARCHAR`, but the EF Core model expected an `INT`. This caused the JWT `OnTokenValidated` hook to crash during revocation checks.
+- **Solution:** Updated the startup hotfix in `Program.cs` to explicitly cast the column: `ALTER TABLE users ALTER COLUMN token_version TYPE INT USING NULLIF(token_version::text, '')::integer;`.
+
+## 14. Interceptor Result Set Interference
+- **Symptom:** `System.InvalidOperationException: The underlying reader doesn't have as many fields as expected. Expected: 11, actual: 1.`
+- **Why:** The `TenantInterceptor` was prepending `SELECT set_config(...)` to database queries. Prepending `SELECT` returns a result set (the config value), which EF Core mistook for the actual data row.
+- **Solution:** Switched from `SELECT set_config(...)` to `SET LOCAL app.current_user_id = '...';`. `SET` is a side-effect command that does not return rows, allowing EF Core to see the intended data.
+
+## 15. Real-time Feed Schema Drift
+- **Symptom:** `Npgsql.PostgresException: 42703: column d.last_seen_at does not exist`.
+- **Why:** New clinical features (Device Heartbeat and Alert Acknowledgement) introduced new columns (`last_seen_at`, `acknowledged_at`) in the C# models, but these were missing from the database schema.
+- **Solution:** Added `last_seen_at` (devices) and `acknowledged_at`/`acknowledged_by` (alerts) to the idempotent startup hotfix in `Program.cs`.
