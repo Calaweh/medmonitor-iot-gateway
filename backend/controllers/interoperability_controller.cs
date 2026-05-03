@@ -171,9 +171,19 @@ public class InteroperabilityController : ControllerBase
             var ack = $"MSH|^~\\&|MedMonitor|Hospital|||{DateTime.UtcNow:yyyyMMddHHmmss}||ACK^R01|MSGID|P|2.3\rMSA|AA|MSGID\r";
             return Content(ack, "text/plain");
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogError(ex, "Error processing HL7 v2 ORU message.");
+            _logger.LogError(ex, "Invalid JSON generated while processing HL7 v2 ORU message.");
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogError(ex, "Invalid HL7 v2 ORU message format.");
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Invalid HL7 v2 ORU message content.");
             return BadRequest(new { error = ex.Message });
         }
     }
