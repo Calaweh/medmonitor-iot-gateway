@@ -1,3 +1,10 @@
+---
+layout: default
+title: MedMonitor - Open-Source Medical IoT Gateway
+description: Pre-compliant Medical IoT Gateway for MIC@Home and hospital step-down wards in ASEAN
+keywords: medical iot, health monitoring, iot gateway, opensource
+---
+
 # MedMonitor: Open-Source Medical IoT Telemetry Gateway (SaMD)
 
 [![License: MIT](https://img.shields.io/github/license/Calaweh/medmonitor-iot-gateway?label=License&color=blue)](LICENSE)
