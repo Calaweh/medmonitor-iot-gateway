@@ -39,7 +39,7 @@
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.0.13" />
 
     <!-- Hangfire -->
-    <PackageReference Include="Hangfire.Core" Version="1.8.17" />
+    <PackageReference Include="Hangfire.Core" Version="1.8.23" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.17" />
     
