@@ -1,34 +1,23 @@
-title: MedMonitor - Open-Source Medical IoT Gateway
-description: Pre-compliant Medical IoT Gateway for MIC@Home and hospital step-down wards in ASEAN
-keywords: medical iot, health monitoring, iot gateway, opensource
+title: "MedMonitor: Medical IoT Gateway"
+description: "Pre-compliant Medical IoT Gateway for MIC@Home and hospital step-down wards in ASEAN"
+lang: en_US
 
+# URL Settings
 url: "https://calaweh.github.io"
 baseurl: "/medmonitor-iot-gateway"
 
+# Build Settings
 theme: jekyll-theme-minimal
-
 plugins:
   - jekyll-seo-tag
 
+# Content Settings
 markdown: kramdown
 highlighter: rouge
-
 kramdown:
   input: GFM
   hard_wrap: false
   parse_block_html: true
 
-exclude:
-  - README.md
-  - "*.gemspec"
-  - Gemfile
-  - Gemfile.lock
-  - node_modules
-  - vendor
-  - docker
-  - frontend
-  - supabase
-  - docker-compose.yml
-  - package.json
-  - package-lock.json
-  - .env.example
+# This ensures Jekyll looks in the docs folder correctly
+include: [docs]
