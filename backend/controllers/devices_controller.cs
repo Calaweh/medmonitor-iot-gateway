@@ -18,8 +18,7 @@ public class DevicePairingDto
 }
 
 [Authorize]
-[ApiController]
-[Route("api/[controller]")]
+[ApiController][Route("api/[controller]")]
 public class DevicesController : ControllerBase
 {
     private readonly AppDbContext _db;

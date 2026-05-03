@@ -95,9 +95,14 @@ public class InteroperabilityController : ControllerBase
             
             return Ok(new { message = "FHIR Observation successfully mapped and ingested." });
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogError(ex, "Error processing FHIR Observation.");
+            _logger.LogError(ex, "Invalid FHIR Observation JSON payload.");
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogError(ex, "Invalid FHIR Observation field format.");
             return BadRequest(new { error = ex.Message });
         }
     }
@@ -120,10 +125,8 @@ public class InteroperabilityController : ControllerBase
             var payloadNode = new JsonObject();
             DateTime recordedAt = DateTime.UtcNow;
 
-            foreach (var seg in segments)
+            foreach (var fields in segments.Select(seg => seg.Split('|')))
             {
-                var fields = seg.Split('|');
-                
                 // Message Header Segment
                 if (fields[0] == "MSH")
                 {
@@ -141,15 +144,11 @@ public class InteroperabilityController : ControllerBase
                 else if (fields[0] == "OBX")
                 {
                     // Format Example: OBX|1|NM|8867-4^Heart Rate^LN||85|bpm|...
-                    if (fields.Length > 5)
+                    if (fields.Length > 5 &&
+                        LoincMap.TryGetValue(fields[3].Split('^')[0], out var internalKey) &&
+                        double.TryParse(fields[5], out var val))
                     {
-                        var obsIdentifier = fields[3].Split('^')[0]; // Isolate LOINC code
-                        var obsValueStr = fields[5];
-
-                        if (LoincMap.TryGetValue(obsIdentifier, out var internalKey) && double.TryParse(obsValueStr, out var val))
-                        {
-                            payloadNode.Add(internalKey, val);
-                        }
+                        payloadNode.Add(internalKey, val);
                     }
                 }
             }

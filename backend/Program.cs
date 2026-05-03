@@ -191,6 +191,7 @@ builder.Services.AddHangfireServer(options =>
 
 builder.Services.AddScoped<RetentionService>();
 builder.Services.AddScoped<AlertEscalationService>();
+builder.Services.AddScoped<AlertEscalationService>();
 
 var app = builder.Build();
 

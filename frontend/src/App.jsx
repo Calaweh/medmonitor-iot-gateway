@@ -346,7 +346,6 @@ function MonitoringLanding() {
 function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) { 
   const { readings, latestReading, alerts } = useVitals(BACKEND_URL, deviceCode, token);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [notes, setNotes] = useState([]);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [newNote, setNewNote] = useState({ subjective: '', objective: '', assessment: '', plan: '' });
@@ -360,10 +359,6 @@ function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) 
       setNotes([]); 
     }
   }, [patientInfo?.patientId, deviceCode]); 
-
-  useEffect(() => {
-    setShowHistory(false);
-  }, [deviceCode]);
 
   const downloadShiftReport = async () => {
     setIsGenerating(true);
@@ -590,7 +585,7 @@ function PatientDetail({ deviceCode, token, patientInfo, onNavigateToHistory }) 
   );
 }
 
-function DeviceHistory({ deviceCode, backendUrl }) {
+export function DeviceHistory({ deviceCode, backendUrl }) {
   const [activeTab, setActiveTab] = useState('admissions'); // 'admissions' | 'telemetry'
   
   // Admissions State
@@ -1180,21 +1175,6 @@ function AccessManagement() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── SYSTEM PARAMETERS PLACEHOLDER ────────────────────────────────────────────
-function SystemParametersPlaceholder() {
-  return (
-    <div className="flex flex-col items-center justify-center h-full gap-5 text-slate-600">
-      <div className="w-20 h-20 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center">
-        <Settings size={36} className="opacity-30" />
-      </div>
-      <div className="text-center">
-        <p className="text-slate-400 font-semibold text-sm">System Parameters</p>
-        <p className="text-xs mt-1">Alert thresholds, retention policies, integrations — coming in Phase 5</p>
-      </div>
     </div>
   );
 }
