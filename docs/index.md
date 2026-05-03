@@ -1,11 +1,18 @@
+---
+layout: default
+title: MedMonitor - Open-Source Medical IoT Gateway
+description: Pre-compliant Medical IoT Gateway for MIC@Home and hospital step-down wards in ASEAN
+keywords: medical iot, health monitoring, iot gateway, opensource
+---
+
 # MedMonitor: Open-Source Medical IoT Telemetry Gateway (SaMD)
 
-[![License: MIT](https://img.shields.io/github/license/Calaweh/medmonitor-iot-gateway?label=License&color=blue)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/Calaweh/medmonitor-iot-gateway?label=License&color=blue)](https://github.com/Calaweh/medmonitor-iot-gateway/blob/main/LICENSE)
 ![Compliance](https://img.shields.io/badge/Compliance-IEC_62304_Class_B_Aligned-success)
 ![Region](https://img.shields.io/badge/Region-ASEAN_(PDPA/HSA)-orange)
 ![Tech Stack](https://img.shields.io/badge/.NET_8-React_19-512BD4)
 
-MedMonitor is an open-source, pre-compliant **Medical IoT Gateway** and real-time vital signs dashboard. It is specifically designed demonstrating feasibility for **MIC@Home** (Mobile Inpatient Care at Home) and hospital step-down wards in the ASEAN region. 
+MedMonitor is an open-source, pre-compliant **Medical IoT Gateway** and real-time vital signs dashboard. It is specifically designed demonstrating feasibility for **MIC@Home** (Mobile Inpatient Care at Home) and hospital step-down wards in the ASEAN region.
 
 ---
 
@@ -64,27 +71,23 @@ MedMonitor utilizes a modern, decoupled architecture designed for high-throughpu
 
 ```mermaid
 graph TD
-    %% Edge Devices
     subgraph Edge["MIC@Home / Ward Edge"]
         D1[Patient Sensor 1] -->|Raw Vitals| Sim[Edge Buffer Gateway]
         D2[Patient Sensor 2] -->|Raw Vitals| Sim
         Sim -- "REST (JSON) + X-Api-Key" --> API
     end
 
-    %% Cloud / On-Prem Backend
     subgraph Backend [".NET 8 Application Server"]
         API[Ingestion API] --> RS[Reading Service / MEWS Logic]
         RS --> |Save| ORM[EF Core]
         RS --> |Broadcast| SigR[SignalR WebSocket Hub]
     end
 
-    %% Database Layer
     subgraph Database ["PostgreSQL (Supabase/AWS)"]
         ORM -- "Session Pooling (5432) + RLS" --> DB[(PostgreSQL)]
         DB --> Aud[HMAC-SHA256 Audit Log]
     end
 
-    %% Frontend UI
     subgraph Frontend["React 19 SPA"]
         SigR -- "Real-time Telemetry" --> UI[Clinical Dashboard]
         UI -- "JWT Authentication" --> API
@@ -98,7 +101,7 @@ graph TD
 | Component | Technology | Regulatory / Security Purpose |
 | :--- | :--- | :--- |
 | **Backend API** | .NET 8 (C#) | High-performance async ingestion; handles EF Core execution strategies. |
-| **Real-time Engine**| SignalR (WebSockets) | Sub-second telemetry propagation to clinical dashboards. |
+| **Real-time Engine** | SignalR (WebSockets) | Sub-second telemetry propagation to clinical dashboards. |
 | **Database** | PostgreSQL (Supabase) | Managed JSONB datastore; Port 5432 Session Pooling for RLS enforcement. |
 | **Frontend** | React 19 + Vite + Recharts | Append-only UI rendering to prevent DOM blocking under high data loads. |
 | **Authentication** | JWT + TOTP (2FA) | Secures clinical API endpoints; bakes dynamic RBAC capabilities into claims. |
@@ -108,20 +111,18 @@ graph TD
 ---
 
 ## ⚖️ The Difference: MedMonitor vs. Traditional Medical IoT
-*(Why Healthcare Procurement & IT Choose MedMonitor)*
-
-When evaluating secure medical monitoring solutions, MedMonitor fundamentally differs from legacy proprietary systems by embedding security directly at the database and application layers.
 
 | Feature / Capability | Traditional IoT Gateways | MedMonitor |
-|----------------------|--------------------------|------------|
+|---|---|---|
 | **Audit Log Integrity** | Standard text/DB logs (can be edited by DBAs) | **HMAC-SHA256 Hash Chain** (Cryptographically tamper-proof) |
-| **Device Authentication**| Static API Keys or IP whitelisting | **Mutual TLS (mTLS)** using X.509 client certificates |
-| **Cross-Ward Data Leakage**| Application-level filtering only | **PostgreSQL Row-Level Security (RLS)** injected into DB session pools |
-| **Alarm Fatigue Mitigation**| Triggers on every threshold breach | **IEC 60601-1-8 Compliant** (5-min rolling suppression + MEWS scoring) |
+| **Device Authentication** | Static API Keys or IP whitelisting | **Mutual TLS (mTLS)** using X.509 client certificates |
+| **Cross-Ward Data Leakage** | Application-level filtering only | **PostgreSQL Row-Level Security (RLS)** injected into DB session pools |
+| **Alarm Fatigue Mitigation** | Triggers on every threshold breach | **IEC 60601-1-8 Compliant** (5-min rolling suppression + MEWS scoring) |
 | **Regulatory Alignment** | Black-box compliance | Pre-mapped for **IEC 62304 Class B** & **HSA CLS-MD Level 2** |
 | **Deployment Cost** | High licensing fees, vendor lock-in | **Open-source**, deployable on PaaS (Render/AWS/Supabase) |
 
 ---
 
 ## 🛡️ Built for Compliance Reviewers & Healthcare IT
+
 According to the latest cybersecurity guidelines for medical devices, zero-trust architecture is mandatory. MedMonitor implements a strict **Dynamic RBAC (Role-Based Access Control)** where an API role (`medmon_api`) has its `UPDATE` and `DELETE` privileges explicitly revoked for clinical telemetry and audit logs, ensuring 100% compliance with data immutability requirements.
